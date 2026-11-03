@@ -1,0 +1,10 @@
+{
+  "name": "unpin",
+  "private": true,
+  "type": "module",
+  "description": "Remove personal metadata from JPEG, PNG and WebP without re-encoding the image.",
+  "scripts": { "test": "node --test tests/*.test.mjs" },
+  "devDependencies": {
+    "exifr": "7.1.3"
+  }
+}
