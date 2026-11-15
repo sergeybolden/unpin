@@ -1,7 +1,7 @@
 # Publish the site to GitHub Pages.
 # Runs on every push to main and every 6 hours, so the star count on the page stays fresh.
 # The count is written into stars.json next to the page: visitors never contact GitHub's API.
-name: Pages
+name: Tests and deploy
 
 on:
   push:

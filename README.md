@@ -1,6 +1,6 @@
 # Unpin
 
-[![Tests and deploy](https://github.com/sergeybolden/unpin/actions/workflows/pages.yml/badge.svg?branch=main)](https://github.com/sergeybolden/unpin/actions/workflows/pages.yml)
+[![Tests and deploy](https://github.com/sergeybolden/unpin/actions/workflows/pages.yml/badge.svg?branch=main&event=push)](https://github.com/sergeybolden/unpin/actions/workflows/pages.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 **See what your photo tells strangers. Then take it out.**
