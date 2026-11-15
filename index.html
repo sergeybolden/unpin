@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; font-src 'self'; img-src 'self' blob: data:; connect-src 'self' blob: data:; worker-src 'self' blob:; object-src 'none'; base-uri 'none'; form-action 'none'">
+<title>Unpin — see what your photo tells strangers</title>
+<meta name="description" content="Check a photo for location, time, phone, serial numbers, faces and QR codes, then remove them. Runs in your browser. Nothing is uploaded.">
+<meta property="og:title" content="Unpin — see what your photo tells strangers">
+<meta property="og:description" content="Location, time, phone, faces, QR codes. Found and removed in your browser. Nothing is uploaded.">
+<!-- Link previews (Threads, X, messengers) need an absolute URL: the site's own address,
+     GitHub Pages under a custom domain. -->
+<link rel="canonical" href="https://unpin.sergeybolden.com/">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://unpin.sergeybolden.com/">
+<meta property="og:image" content="https://unpin.sergeybolden.com/assets/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Unpin: a photo by a river with the face marked, and the location, time and phone hidden in its file.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#ffffff">
+<link rel="icon" href="assets/favicon.ico" sizes="32x32">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="preload" href="vendor/fonts/figtree-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="css/app.css">
+<script src="js/demo-start.js"></script>
+</head>
+<body>
+<header class="nav">
+  <a class="brand" href="./"><img src="assets/favicon.svg" alt="" width="32" height="32"><span>Unpin</span></a>
+  <a class="gh" id="gh" href="https://github.com/sergeybolden/unpin" rel="noopener" aria-label="Star Unpin on GitHub">
+    <span class="gh-main">
+      <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+      <svg class="gh-star" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M8 .25a.75.75 0 01.673.418l1.882 3.815 4.21.612a.75.75 0 01.416 1.279l-3.046 2.97.719 4.192a.75.75 0 01-1.088.791L8 12.347l-3.766 1.98a.75.75 0 01-1.088-.79l.72-4.194L.818 6.374a.75.75 0 01.416-1.28l4.21-.611L7.327.668A.75.75 0 018 .25z"/></svg>
+      Star
+    </span>
+    <span class="gh-count" id="gh-count" hidden></span>
+  </a>
+</header>
+
+<input type="file" id="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,image/avif,.heic,.heif" multiple hidden>
+
+<main>
+  <section class="hero" id="hero">
+    <div class="hero-grid">
+      <!-- The left column is also where a dragged photo goes: it turns into a drop frame. -->
+      <div class="hero-left" id="drop">
+      <div class="drop-hint" aria-hidden="true"><span class="drop-ping"><i></i><i></i><i></i><span class="mascot" id="mascot-drop"></span></span><span>Drop the photo here</span></div>
+      <div class="hero-text">
+        <p class="proof"><svg class="ic" aria-hidden="true"><use href="assets/icons.svg?v=b917973d#shield-check"/></svg>Free · Open source · Nothing is uploaded</p>
+        <h1>See what your photo tells strangers</h1>
+        <p class="lead">Location, time, phone, faces and QR codes. Unpin finds them and takes them out before you post.</p>
+        <div class="cta">
+          <button class="btn btn-yellow" type="button" data-choose><svg class="ic" aria-hidden="true"><use href="assets/icons.svg?v=b917973d#upload-simple"/></svg>Choose a photo</button>
+        </div>
+      </div>
+      <ol class="process" aria-label="How it works">
+        <li><svg class="ic" aria-hidden="true"><use href="assets/icons.svg?v=b917973d#upload-simple"/></svg><span><b>Choose<span class="for-mouse"> or drop</span> a photo.</b> JPEG, PNG, WebP or iPhone HEIC.</span></li>
+        <li><svg class="ic" aria-hidden="true"><use href="assets/icons.svg?v=b917973d#scan"/></svg><span><b>See what it gives away.</b> Faces and codes are marked.</span></li>
+        <li><svg class="ic" aria-hidden="true"><use href="assets/icons.svg?v=b917973d#check-circle"/></svg><span><b>Download the clean copy.</b> Checked again before saving.</span></li>
+      </ol>
+      </div>
+
+      <figure class="hero-photo">
+        <div class="demo-photo">
+          <img src="assets/demo/river.jpg" width="840" height="1050" alt="A young man stands on a stone riverside walk. Behind him are a tourist boat and a yellow arched bridge.">
+          <span class="mark m-face"><b><svg class="ic" aria-hidden="true"><use href="assets/icons.svg?v=b917973d#smiley"/></svg>Face</b></span>
+          <span class="mark m-bridge clue"><b><svg class="ic" aria-hidden="true"><use href="assets/icons.svg?v=b917973d#bridge"/></svg>A known bridge</b></span>
+          <span class="mark m-boat clue"><b><svg class="ic" aria-hidden="true"><use href="assets/icons.svg?v=b917973d#boat"/></svg>Tourist boat</b></span>
+          <!-- Over the bottom of the photo: what the file says, like a gallery's Info panel,
+               and under it, apart from the card, the way to open this photo in the tool. -->
+          <div class="demo-over">
+          <div class="demo-info">
+            <!-- The header is the file itself, like the Info panel in a phone's gallery. -->
+            <p class="facts-title"><svg class="ic" aria-hidden="true"><use href="assets/icons.svg?v=b917973d#file-image"/></svg><b>IMG_1994.jpg</b><span>invisible on the photo</span></p>
+            <ul class="facts">
+              <li class="fact high"><svg class="ic" aria-hidden="true"><use href="assets/icons.svg?v=b917973d#map-pin"/></svg><b>Where</b><span>15.87677, 108.33640 · Hoi An</span></li>
+              <li class="fact"><svg class="ic" aria-hidden="true"><use href="assets/icons.svg?v=b917973d#clock"/></svg><b>When</b><span>3 August 2026, 16:05</span></li>
+              <li class="fact"><svg class="ic" aria-hidden="true"><use href="assets/icons.svg?v=b917973d#device-mobile"/></svg><b>With what</b><span>iPhone 11 · iOS 26.5.2</span></li>
+            </ul>
+          </div>
+          <button class="btn demo-try" type="button" id="demo-try"><svg class="ic" aria-hidden="true"><use href="assets/icons.svg?v=b917973d#sparkle"/></svg>Try Unpin on this photo</button>
+          </div>
+        </div>
+      </figure>
+    </div>
+  </section>
+
+  <section class="error" id="error" hidden role="alert">
+    <span class="mascot" id="mascot-error" aria-hidden="true"></span>
+    <h2>This photo couldn't be opened</h2>
+    <p id="error-text"></p>
+    <button class="btn btn-yellow" type="button" id="error-again"><svg class="ic" aria-hidden="true"><use href="assets/icons.svg?v=b917973d#upload-simple"/></svg>Choose another photo</button>
+  </section>
+
+  <section class="result" id="result" hidden>
+    <!-- Left: back button and file name, the photo, its download (these stay in view on a computer),
+         then the tip. Right: the report, across the full height. -->
+    <div class="grid work">
+      <div class="left">
+      <div class="bar">
+        <button class="btn btn-gray btn-sm" id="again" type="button"><svg class="ic" aria-hidden="true"><use href="assets/icons.svg?v=b917973d#arrow-left"/></svg><span>Another photo</span></button>
+        <span id="filename" class="muted"></span>
+        <span id="queue" class="muted"></span>
+      </div>
+      <div class="panel editor" id="editor">
+        <!-- Full screen: the photo fills the screen, the tools float over it; this closes it. -->
+        <button class="fs-close" type="button" id="fs-close" aria-label="Close full screen"><svg class="ic" aria-hidden="true"><use href="assets/icons.svg?v=b917973d#x"/></svg></button>
+        <div class="stage" id="stage">
+          <div class="frame">
+            <canvas id="photo" aria-label="Your photo with covered areas"></canvas>
+            <canvas id="overlay" aria-hidden="true"></canvas>
+            <div class="marks" id="marks"></div>
+            <div class="scanline" aria-hidden="true"></div>
+            <div class="develop" aria-hidden="true"><span class="mascot" id="mascot-develop"></span></div>
+          </div>
+        </div>
+        <!-- Icon tools under the photo, like in a photo editor. Names are in the tooltip and for screen readers. -->
+        <div class="toolbar" role="toolbar" aria-label="Photo tools">
+          <button class="tool" type="button" id="tool-move" aria-pressed="true" aria-label="Move and resize boxes (V)" data-tip="Move and resize (V)"><svg class="ic" aria-hidden="true"><use href="assets/icons.svg?v=b917973d#cursor"/></svg></button>
+          <button class="tool" type="button" id="addbox" aria-pressed="false" aria-label="Add a box (B)" data-tip="Add a box (B)"><svg class="ic" aria-hidden="true"><use href="assets/icons.svg?v=b917973d#selection-plus"/></svg></button>
+          <span class="tool-sep" aria-hidden="true"></span>
+          <button class="tool" type="button" id="original" aria-pressed="false" aria-label="Show the original" data-tip="Show the original"><svg class="ic" aria-hidden="true"><use href="assets/icons.svg?v=b917973d#eye"/></svg></button>
+          <button class="tool" type="button" id="fullscreen" aria-pressed="false" aria-label="Full screen (F)" data-tip="Full screen (F)"><svg class="ic" aria-hidden="true"><use href="assets/icons.svg?v=b917973d#corners-out"/></svg></button>
+          <span class="tool-sep" aria-hidden="true"></span>
+          <button class="tool" type="button" id="help" popovertarget="tools-help" aria-label="How to use the tools" data-tip="How to use the tools"><svg class="ic" aria-hidden="true"><use href="assets/icons.svg?v=b917973d#question"/></svg></button>
+        </div>
+        <!-- How to use the tools: opens from the ? in the toolbar, above it. Closes on a tap
+             elsewhere, Esc or scrolling. -->
+        <div class="tools-help" id="tools-help" popover>
+          <p><svg class="ic" aria-hidden="true"><use href="assets/icons.svg?v=b917973d#selection-plus"/></svg><span><b>Blur something else:</b> pick the box tool and drag on the photo. Street signs, house numbers, car plates and screens are worth a look.</span></p>
+          <p><svg class="ic" aria-hidden="true"><use href="assets/icons.svg?v=b917973d#cursor"/></svg><span><b>Fix a box:</b> with the arrow tool, drag it to move it, or drag a corner to resize it.</span></p>
+          <p><svg class="ic" aria-hidden="true"><use href="assets/icons.svg?v=b917973d#x"/></svg><span><b>Keep something visible:</b> point at its box, or tap it, and press ×.</span></p>
+        </div>
+        <p id="status" class="status muted small" role="status" aria-live="polite"></p>
+        <!-- While small faces far away are still searched for, after the report is out. -->
+        <p id="far-status" class="status muted small busy" hidden>Still looking for faces far away…</p>
+      </div>
+      <!-- Download right under the photo, like Export in an editor; apart from both panels. -->
+      <div class="actionbar">
+        <button id="clean" class="btn btn-yellow btn-wide" type="button" disabled><svg class="ic" aria-hidden="true"><use href="assets/icons.svg?v=b917973d#download-simple"/></svg><span>Checking the photo…</span></button>
+        <label class="keepname"><input type="checkbox" id="keepname"> Keep the original file name</label>
+      </div>
+      </div>
+      <div class="panel report-panel">
+        <!-- What the original file says. After a download the check report takes its place. -->
+        <div id="report">
+          <h2 id="verdict" tabindex="-1">What this photo tells</h2>
+          <!-- Placeholders while the photo is being checked; the findings replace them all at once. -->
+          <div class="skeleton" aria-hidden="true">
+            <div class="sk sk-map"></div>
+            <div class="sk sk-card"><i></i><b></b><b class="short"></b></div>
+            <div class="sk sk-card"><i></i><b></b><b class="short"></b></div>
+            <div class="sk sk-card"><i></i><b></b><b class="short"></b></div>
+          </div>
+          <!-- The location is told on the map itself: what, where exactly, and the nearest town. -->
+          <div id="mapwrap" class="mapwrap" hidden>
+            <div class="mapframe">
+              <canvas id="map" aria-hidden="true"></canvas>
+              <span class="map-spot" id="map-spot" hidden aria-hidden="true">
+                <span class="map-pulse"></span>
+                <span class="map-dot"></span>
+                <svg class="map-pin"><use href="assets/icons.svg?v=b917973d#map-pin-fill"/></svg>
+              </span>
+              <div class="map-label map-where">
+                <strong><svg class="ic" aria-hidden="true"><use href="assets/icons.svg?v=b917973d#map-pin"/></svg>Where it was taken</strong>
+                <span id="map-coords"></span>
+              </div>
+              <div class="map-label map-near" id="near" hidden></div>
+              <div class="map-note" title="The map is drawn in this page from bundled outlines: the location never leaves it.">Drawn offline</div>
+            </div>
+          </div>
+          <ul id="findings" class="findings"></ul>
+        </div>
+        <div id="after" class="after" hidden role="status" aria-live="polite"></div>
+        <p id="format-note" class="format-note muted small center"></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Two columns on a computer: the heading stays on the left while the cards scroll on the right. -->
+  <section class="section landing split">
+    <div class="split-head">
+    <h2 class="big">What Unpin checks,<br> and where it stops</h2>
+    <p class="sub">Three kinds of leaks, three ways to deal with them.</p>
+    </div>
+    <div class="split-body">
+    <!-- Grouped by what Unpin does, not one row per data type. The fine print (quality, HEIC,
+         animations, Content Credentials) is in the questions below. -->
+    <div class="checks">
+      <section class="check done">
+        <h3><svg class="ic" aria-hidden="true"><use href="assets/icons.svg?v=b917973d#file-x"/></svg>Removed from the file</h3>
+        <p>Every time, nothing to set up.</p>
+        <ul class="chips">
+          <li><svg class="ic" aria-hidden="true"><use href="assets/icons.svg?v=b917973d#map-pin"/></svg>Location</li>
+          <li><svg class="ic" aria-hidden="true"><use href="assets/icons.svg?v=b917973d#clock"/></svg>Time</li>
+          <li><svg class="ic" aria-hidden="true"><use href="assets/icons.svg?v=b917973d#device-mobile"/></svg>Phone</li>
+          <li><svg class="ic" aria-hidden="true"><use href="assets/icons.svg?v=b917973d#hash"/></svg>Serial numbers</li>
+          <li><svg class="ic" aria-hidden="true"><use href="assets/icons.svg?v=b917973d#user-circle"/></svg>Names</li>
+          <li><svg class="ic" aria-hidden="true"><use href="assets/icons.svg?v=b917973d#image"/></svg>Hidden previews</li>
+          <li><svg class="ic" aria-hidden="true"><use href="assets/icons.svg?v=b917973d#magic-wand"/></svg>AI prompts</li>
+        </ul>
+      </section>
+      <section class="check found">
+        <h3><svg class="ic" aria-hidden="true"><use href="assets/icons.svg?v=b917973d#scan"/></svg>Found and covered</h3>
+        <p>Tiny, turned or damaged ones can be missed. Check the preview before you save.</p>
+        <ul class="chips">
+          <li><svg class="ic" aria-hidden="true"><use href="assets/icons.svg?v=b917973d#smiley"/></svg>Faces</li>
+          <li><svg class="ic" aria-hidden="true"><use href="assets/icons.svg?v=b917973d#qr-code"/></svg>QR codes</li>
+          <li><svg class="ic" aria-hidden="true"><use href="assets/icons.svg?v=b917973d#barcode"/></svg>Barcodes</li>
+        </ul>
+      </section>
+      <section class="check yours">
+        <h3><svg class="ic" aria-hidden="true"><use href="assets/icons.svg?v=b917973d#selection-plus"/></svg>Up to you</h3>
+        <p>Apps can guess the place from the background alone. Draw a box over these to blur them.</p>
+        <ul class="chips">
+          <li><svg class="ic" aria-hidden="true"><use href="assets/icons.svg?v=b917973d#signpost"/></svg>Street signs</li>
+          <li><svg class="ic" aria-hidden="true"><use href="assets/icons.svg?v=b917973d#car-profile"/></svg>Car plates</li>
+          <li><svg class="ic" aria-hidden="true"><use href="assets/icons.svg?v=b917973d#house-line"/></svg>House numbers</li>
+          <li><svg class="ic" aria-hidden="true"><use href="assets/icons.svg?v=b917973d#app-window"/></svg>Window view</li>
+          <li><svg class="ic" aria-hidden="true"><use href="assets/icons.svg?v=b917973d#sunglasses"/></svg>Reflections</li>
+          <li><svg class="ic" aria-hidden="true"><use href="assets/icons.svg?v=b917973d#monitor"/></svg>Screens</li>
+          <li><svg class="ic" aria-hidden="true"><use href="assets/icons.svg?v=b917973d#package"/></svg>Parcels</li>
+          <li><svg class="ic" aria-hidden="true"><use href="assets/icons.svg?v=b917973d#key"/></svg>Keys and cards</li>
+        </ul>
+      </section>
+    </div>
+    <p class="ai-line"><svg class="ic" aria-hidden="true"><use href="assets/icons.svg?v=b917973d#sparkle"/></svg><span><b>Made with AI?</b> Unpin reads AI labels and names the tool. A screenshot or re-save removes the label.</span></p>
+    </div>
+  </section>
+
+  <section class="section landing split">
+    <div class="split-head">
+    <h2 class="big">Questions</h2>
+    <span class="mascot mascot-faq" id="mascot-faq" aria-hidden="true"></span>
+    </div>
+    <div class="split-body">
+    <div class="faq" id="faq">
+      <details><summary>Is my photo uploaded anywhere?</summary><p>No. Everything happens in this browser tab, and the page is not allowed to connect to any other server.</p></details>
+      <details><summary>Does it work offline?</summary><p>Yes, once the parts are on your device. The page and metadata cleaning are saved on your first visit. The face finder (15 MB) and the HEIC decoder (3 MB) are saved the first time you use them, or right now with the button below.</p><p><button class="btn btn-gray btn-sm" type="button" id="offline"><svg class="ic" aria-hidden="true"><use href="assets/icons.svg?v=b917973d#wifi-slash"/></svg>Save everything for offline use</button> <span id="offline-status" class="muted small" role="status" aria-live="polite"></span></p></details>
+      <details><summary>Does it lower the quality?</summary><p>Not for JPEG, PNG and WebP: Unpin removes the data blocks and leaves the picture untouched. If you cover something, the picture is saved again at high quality. An animation is saved as a still picture of its first frame, because that's the frame Unpin checks. HEIC and AVIF are saved as JPEG.</p></details>
+      <details><summary>Do Instagram and Threads remove location anyway?</summary><p>Big social apps remove it from public posts, but plenty of ways to share don't: sending as a file, email, cloud links, some messengers and marketplaces. And the faces and codes on the picture stay everywhere.</p></details>
+      <details><summary>Can it tell if a picture was made with AI?</summary><p>Only from labels in the file. ChatGPT, Adobe Firefly, Google, Meta and others add Content Credentials or an AI label, and Stable Diffusion tools write their settings into PNG files; Unpin reads these and names the tool. Screenshots, messengers and re-saving often remove the labels, so “no AI label” doesn't mean the picture is real. Unpin doesn't guess from the pixels.</p></details>
+      <details><summary>Why are Content Credentials removed?</summary><p>Content Credentials (C2PA) are signed over the whole file, so they can't stay valid once other data is removed, and they can include a location or a preview. The “made with AI” label is removed too: the saved file carries only the picture. An invisible watermark in the pixels, such as Google's SynthID, stays.</p></details>
+      <details><summary>Can it find everything?</summary><p>No. It finds the hidden data, faces, QR codes and barcodes. Street signs, plates and landmarks are up to you.</p></details>
+      <details><summary>Can data be hidden inside the picture itself?</summary><p>Yes, if someone put it there on purpose. When Unpin cleans a JPEG or WebP without saving it again, it keeps the original compressed picture data, so data deliberately added inside it may stay in the downloaded file. Phones and cameras don't do this. PNG picture data is checked: if it holds more than the picture, the PNG is saved again. Anything coded into the visible pixels themselves stays in any case.</p></details>
+    </div>
+    </div>
+  </section>
+
+  <!-- The last call, under an arch that fades out downwards. -->
+  <section class="final landing">
+    <h2 class="big">Check a photo now</h2>
+    <p class="sub">Free, in your browser. Nothing is uploaded.</p>
+    <button class="btn btn-yellow" type="button" data-choose><svg class="ic" aria-hidden="true"><use href="assets/icons.svg?v=b917973d#upload-simple"/></svg>Choose a photo</button>
+  </section>
+</main>
+
+<footer class="foot">
+  <p>Open source, MIT. Made by <a href="https://www.threads.com/@sergeybolden" rel="noopener">Sergey Bolden</a>.</p>
+  <p><a href="https://github.com/sergeybolden/unpin" rel="noopener">Source code</a> · <a href="vendor/LICENSES/README.md">Third-party licenses</a></p>
+  <!-- The name, as wide as the content column, cut off by the bottom edge of the page.
+       The viewBox is the ink of "Unpin" in Figtree 800 at 100 px (measured), down to 14 px above
+       the baseline, so it fills the column edge to edge at any width. -->
+  <!-- The mascot stands behind the "n": the letter hides its body, its hands rest on top of it. -->
+  <div class="wm landing">
+    <span class="wm-peek" aria-hidden="true"><span class="mascot mascot-peek" id="mascot-peek"></span></span>
+    <svg class="wordmark" viewBox="5.8 -74 240.8 60" aria-hidden="true" focusable="false"><text x="0" y="0">Unpin</text></svg>
+    <span class="wm-hands" aria-hidden="true"><span class="mascot mascot-peek" id="mascot-peek-hands"></span></span>
+    <span class="wm-end" id="wm-end"></span>
+  </div>
+</footer>
+
+<script type="module" src="js/app.js"></script>
+</body>
+</html>

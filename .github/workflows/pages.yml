@@ -1,0 +1,71 @@
+# Publish the site to GitHub Pages.
+# Runs on every push to main and every 6 hours, so the star count on the page stays fresh.
+# The count is written into stars.json next to the page: visitors never contact GitHub's API.
+name: Pages
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "17 */6 * * *"
+  workflow_dispatch:
+
+# Nothing by default; each job gets only what it needs. The test job installs npm packages,
+# so it may only read: a bad package there can't publish the site.
+permissions: {}
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      # No install scripts: the tests need the packages' files, not anything they would run.
+      - run: npm ci --ignore-scripts
+      - run: npm test
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Write the star count
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          stars=$(gh api "repos/${GITHUB_REPOSITORY}" --jq .stargazers_count || echo "")
+          if [ -n "$stars" ]; then echo "{\"stars\": $stars}" > stars.json; fi
+
+      # Only the site itself: no tests, scripts or Worker code.
+      - name: Collect the site files
+        run: |
+          mkdir _site
+          cp -r index.html manifest.webmanifest sw.js css js assets vendor _site/
+          [ -f stars.json ] && cp stars.json _site/ || true
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - id: deployment
+        uses: actions/deploy-pages@v4
