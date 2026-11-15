@@ -1,5 +1,8 @@
 # Unpin
 
+[![Tests and deploy](https://github.com/sergeybolden/unpin/actions/workflows/pages.yml/badge.svg?branch=main)](https://github.com/sergeybolden/unpin/actions/workflows/pages.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 **See what your photo tells strangers. Then take it out.**
 
 **[Open Unpin →](https://unpin.sergeybolden.com/)** Runs in your browser. Nothing is uploaded.
@@ -24,7 +27,12 @@ Removing location data is no longer enough. Since 2025, chat assistants can ofte
 
 ## What stays
 
-- **The picture itself.** JPEG, PNG and WebP are cleaned block by block, without re-compressing a single pixel. The color profile and the photo's rotation stay; the profile keeps only its colors and a standard or neutral name, without the device, the date or any text. Only what a viewer shows is kept: a second picture or frame hidden in the file is never copied, and such a file is saved again instead. PNG picture data is unpacked and checked too: if it holds more than the picture, the PNG is saved again. When Unpin cleans a JPEG or WebP without saving it again, it keeps the original compressed picture data, so data deliberately added inside it may stay in the downloaded file. Phones and cameras don't do this. HEIC and AVIF are saved as JPEG. If you cover something, the picture is saved again at high quality, and an animation becomes a still image.
+- **The picture itself.** JPEG, PNG and WebP are cleaned block by block, without re-compressing a single pixel.
+- **Color and rotation.** The color profile and the photo's rotation stay; the profile keeps only its colors and a standard or neutral name, without the device, the date or any text.
+- **Only what a viewer shows.** A second picture or frame hidden in the file is never copied, and such a file is saved again instead. PNG picture data is unpacked and checked too: if it holds more than the picture, the PNG is saved again.
+- **One limit.** When Unpin cleans a JPEG or WebP without saving it again, it keeps the original compressed picture data, so data deliberately added inside it may stay in the downloaded file. Phones and cameras don't do this.
+- **When the picture is saved again.** HEIC and AVIF are saved as JPEG. If you cover something, the picture is saved again at high quality, and an animation becomes a still image.
+
 ## What goes
 
 - **Content Credentials (C2PA)** are removed. They are signed over the whole file, so they can't stay valid once other data is taken out, and they can carry a location or a preview.
@@ -48,6 +56,10 @@ python3 -m http.server 8000
 ```
 
 Then open http://localhost:8000. To update the bundled libraries: `npm install && npm run vendor`. Tests: `npm test` (they also run before every deploy).
+
+## Contributing
+
+Bug reports and fixes are welcome: see [CONTRIBUTING.md](CONTRIBUTING.md). To report a security problem privately, see [SECURITY.md](SECURITY.md).
 
 ## License
 
