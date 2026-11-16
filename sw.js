@@ -6,7 +6,7 @@
 // - LIBS: the face finder and the HEIC decoder (about 17 MB). They don't change between releases,
 //   so their cache outlives them; its name carries the library versions from package.json
 //   (tests/sw.test.mjs checks that), so a library update starts a new one and the old copies go.
-const VERSION = "unpin-v33";
+const VERSION = "unpin-v34";
 const LIBS = "unpin-libs-mediapipe-1.2.0-heic-to-1.6.7";
 const CORE = [
   "./", "index.html", "licenses.html", "css/app.css", "manifest.webmanifest", "assets/favicon.svg", "assets/favicon.ico", "assets/icons.svg", "vendor/fonts/figtree-latin.woff2",

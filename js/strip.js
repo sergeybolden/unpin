@@ -488,6 +488,7 @@ function pngChunk(type, data) {
 const PNG_IEND = pngChunk("IEND", new Uint8Array(0));
 
 // zlib, as PNG stores the profile. Capped, so a small file can't unpack into gigabytes.
+// Refused if anything follows the end of the packed data.
 async function inflate(data, cap) {
   const reader = new Blob([data]).stream().pipeThrough(new DecompressionStream("deflate")).getReader();
   const parts = [];
@@ -503,6 +504,12 @@ async function inflate(data, cap) {
   } catch (e) {
     throw e instanceof BrokenFileError ? e : new BrokenFileError("The color profile is damaged");
   }
+  // The stream must end at the chunk's last byte: bytes after its end are never read by a viewer
+  // but would be copied with the chunk. Some unpackers ignore them, so, as for the image data
+  // below, it is tested directly: the stream without its last byte must fail to unpack.
+  let endsEarly = true;
+  try { await unpackedSize(new Blob([data.subarray(0, data.length - 1)]), cap); } catch { endsEarly = false; }
+  if (endsEarly) throw new BrokenFileError("The color profile is damaged");
   return concat(parts);
 }
 const deflate = async (data) =>

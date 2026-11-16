@@ -353,6 +353,23 @@ test("Color profile: names and the device go, the colors stay", async () => {
   assert.deepEqual(Buffer.from(cleanIcc(c)), Buffer.from(c), "cleaning twice changes nothing");
 });
 
+test("PNG: bytes after the end of the packed color profile are refused, not copied", async () => {
+  const { deflateSync } = await import("node:zlib");
+  // A file Unpin cleaned itself: its profile is clean, so the chunk would be copied as it is.
+  const clean = (await stripPng(pngSetting(pngChunk("iCCP", cat(enc("ICC Profile\0\0"), deflateSync(iccProfile())))))).bytes;
+  assert.deepEqual((await stripPng(clean)).removed, [], "the clean file passes untouched");
+  const at = Buffer.from(clean).indexOf(Buffer.from("iCCP"));
+  const len = new DataView(clean.buffer, clean.byteOffset).getUint32(at - 4);
+  const end = at + 4 + len; // the chunk's checksum; left as it is, since the cleaner doesn't read it
+  const secret = enc("SECRET-lat-16.05-lon-108.2");
+  const u32 = (n) => new Uint8Array([n >>> 24, (n >>> 16) & 255, (n >>> 8) & 255, n & 255]);
+  for (const [what, name] of [["a clean profile", "ICC Profile"], ["a profile to clean", "Calibrated by Alice Example"]]) {
+    const body = name === "ICC Profile" ? clean.subarray(at + 4, end) : cat(enc(`${name}\0\0`), deflateSync(iccProfile()));
+    const file = cat(clean.subarray(0, at - 4), u32(body.length + secret.length), enc("iCCP"), body, secret, clean.subarray(end));
+    await assert.rejects(stripPng(file), /The color profile is damaged/, what);
+  }
+});
+
 test("Color profile: cleaned in PNG (with its name), JPEG and WebP", async () => {
   const p = iccProfile();
   const { deflateSync } = await import("node:zlib");
