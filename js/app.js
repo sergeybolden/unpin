@@ -5,6 +5,7 @@ import { findFacesOffPage, findCodes } from "./detect.js";
 import { redact, canvasToBytes } from "./redact.js";
 import { imageInfo, webpMetadata } from "./inspect.js";
 import { exportPlan, codeCheck } from "./plan.js";
+import { cleanName, batchNames, batchOutcome, crc32, zipParts, ZIP_LIMIT } from "./batch.js";
 import { drawMap } from "./map.js";
 import { liveLogo } from "./logo.js";
 import { dropScene, developScene, afterScene, errorScene, questionsScene, footerScene } from "./mascot-places.js";
@@ -18,7 +19,7 @@ function icon(name) {
   svg.setAttribute("class", "ic");
   svg.setAttribute("aria-hidden", "true");
   const use = document.createElementNS(SVG, "use");
-  use.setAttribute("href", `assets/icons.svg?v=b917973d#${name}`);
+  use.setAttribute("href", `assets/icons.svg?v=b10aaadc#${name}`);
   svg.append(use);
   return svg;
 }
@@ -31,7 +32,11 @@ const FINDING_ICONS = {
   location: "map-pin", place: "map-pin", time: "clock", device: "device-mobile", serial: "hash", owner: "user-circle",
   note: "note-pencil", prompt: "magic-wand", thumb: "image", extra: "stack", c2pa: "seal-check", ai: "sparkle",
 };
-const state = { queue: [], cur: null, op: 0, urls: [] };
+// queue: photos opened together, waiting; file: the one under review; batch: a running "Clean all".
+const state = { queue: [], cur: null, file: null, batch: null, op: 0, urls: [] };
+// A problem with the photo, said in the app's own words. Anything else that goes wrong while
+// opening a photo is shown as a plain "couldn't be opened", never as a raw JavaScript message.
+class PhotoError extends Error {}
 const SUPPORTED = new Set(["jpeg", "png", "webp", "heic", "avif"]);
 const MAX_BYTES = 80 * 1024 * 1024;
 const MAX_PIXELS = 64 * 1000 * 1000;
@@ -201,13 +206,24 @@ $("again").addEventListener("click", () => {
   home();
 });
 $("error-again").addEventListener("click", () => { home(); $("file").click(); });
+$("error-next").addEventListener("click", () => { if (state.queue.length) open(state.queue.shift()); });
 
-function home() {
-  state.op++;
+$("clean-all").addEventListener("click", () => cleanAll([state.file, ...state.queue].filter(Boolean)));
+$("error-all").addEventListener("click", () => cleanAll(state.queue));
+
+// The photo under review is let go: its background face search and its mascot stop.
+function leaveReview() {
   mascot.develop.stop();
   state.cur?.farStop?.(); // the background face search is for this photo only
   state.cur = null;
+  state.file = null;
   showFarStatus();
+}
+
+function home() {
+  state.op++;
+  leaveReview();
+  clearBatch();
   document.body.classList.remove("working");
   $("result").hidden = true;
   $("error").hidden = true;
@@ -220,6 +236,13 @@ function start(files) {
   state.queue = files.slice(1);
   open(files[0]);
 }
+
+// The map is drawn in the theme's colours (js/map.js reads them): when the system switches
+// between light and dark while it is on screen, it is drawn again.
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
+  const loc = state.cur?.info?.findings.find((f) => f.id === "location");
+  if (loc && !$("mapwrap").hidden) drawMap($("map"), loc.lat, loc.lon);
+});
 
 // ---------- states ----------
 // ---------- motion ----------
@@ -288,17 +311,23 @@ function setPhase(cur, phase, text) {
 
 function fail(id, message) {
   if (id !== state.op) return;
-  state.cur?.farStop?.();
-  state.cur = null;
-  showFarStatus();
-  mascot.develop.stop();
+  leaveReview();
+  clearBatch();
   setScanning(false);
   $("status").classList.remove("busy");
   $("result").hidden = true;
   $("error").hidden = false;
   $("error-text").textContent = message;
+  // The other photos opened with this one are still waiting: going on to them is the main step.
+  // With more than one, they can be cleaned all at once too.
+  const waiting = state.queue.length;
+  $("error-next").hidden = !waiting;
+  if (waiting) label($("error-next"), "arrow-right", `Next photo (${waiting} waiting)`);
+  $("error-all").hidden = waiting < 2;
+  if (waiting >= 2) label($("error-all"), "stack", `Clean all ${waiting}`);
+  $("error-again").className = waiting ? "btn btn-gray" : "btn btn-yellow";
   mascot.error.show();
-  $("error-again").focus();
+  $(waiting ? "error-next" : "error-again").focus();
 }
 
 // ---------- open a photo ----------
@@ -308,7 +337,9 @@ async function open(file) {
   state.urls = [];
   state.cur?.farStop?.(); // the previous photo's background face search
   state.cur = null;
+  state.file = file;
   showFarStatus();
+  clearBatch();
   document.body.classList.add("working");
   $("hero").hidden = true;
   $("error").hidden = true;
@@ -321,6 +352,9 @@ async function open(file) {
   $("queue").textContent = state.queue.length ? `· ${state.queue.length} more waiting` : "";
   if (state.queue.length) label($("again"), "arrow-right", "Next photo");
   else label($("again"), "arrow-left", "Another photo");
+  // Several photos: the review stays the main way, cleaning them all at once is the other.
+  $("clean-all").hidden = !state.queue.length;
+  if (state.queue.length) label($("clean-all"), "stack", `Clean all ${state.queue.length + 1}`);
   $("verdict").textContent = "Checking the photo…";
   $("report").classList.add("pending");
   const opened = performance.now();
@@ -341,61 +375,16 @@ async function open(file) {
   mascot.develop.start();
 
   try {
-    if (file.size > MAX_BYTES) throw new Error(`This file is ${Math.round(file.size / 1e6)} MB. Unpin opens photos up to 80 MB.`);
-    const bytes = new Uint8Array(await file.arrayBuffer());
-    if (id !== state.op) return;
-    const format = detectFormat(bytes);
-    if (!SUPPORTED.has(format)) throw new Error("This doesn't look like a JPEG, PNG, WebP, HEIC or AVIF photo.");
-
-    // Size from the header first: a small file can still be a huge picture.
-    const head = imageInfo(bytes, format);
-    if (head) checkPixels(head.width, head.height);
-
-    // What exifr reads. WebP metadata goes through a JPEG shell, because exifr can't read WebP.
-    let metaSrc = bytes;
-    let metaPartial = false;
-    if (format === "webp") {
-      const m = webpMetadata(bytes);
-      metaSrc = m ? m.bytes : null;
-      metaPartial = !!m?.partial;
-    }
-
-    let orientation = 1;
-    if (metaSrc) try { orientation = (await exifr.orientation(metaSrc)) || 1; } catch {}
-    if (!Number.isInteger(orientation) || orientation < 1 || orientation > 8) orientation = 1; // 1–8 are the only turns there are
-    if (id !== state.op) return;
-    // The photo's shape before decoding. EXIF turns of 90° (orientation 5–8) swap the sides;
-    // HEIC and AVIF sizes are already turned (their own irot box).
-    if (head) {
-      const turned = orientation >= 5 && format !== "heic" && format !== "avif";
-      sizeFrame(turned ? head.height : head.width, turned ? head.width : head.height);
-    }
-
-    let preview = null;
-    let brokenNote = "";
-    try {
-      preview = await stripLossless(bytes, format, { orientation });
-    } catch (e) {
-      preview = null;
-      if (e instanceof BrokenFileError) brokenNote = `${e.message}. The picture will be saved again instead of cleaned in place.`;
-    }
-    // PNG and WebP keep no rotation flag after cleaning; re-save turned pictures upright instead.
-    if (preview && format !== "jpeg" && orientation !== 1) preview = null;
-
-    const src = await decode(file, format, id, orientation);
-    if (id !== state.op) return;
-
-    const animated = !!(head?.animated || preview?.animated);
-    const cur = {
-      id, file, bytes, format, preview, src, shown: src, regions: [], info: null, orientation, brokenNote, rev: 0,
-      alpha: !!head?.alpha, animated, metaPartial,
-    };
+    const live = () => id === state.op;
+    const photo = await readPhoto(file, { live, onSize: sizeFrame, onStatus: (t) => { if (live()) $("status").textContent = t; } });
+    if (!photo || !live()) return;
+    const cur = { ...photo, id, shown: photo.src, regions: [], info: null, rev: 0 };
     state.cur = cur;
     setPhase(cur, "reading", "Reading what the file says…");
     paint();
     mascot.develop.photo();
 
-    cur.info = await xray(file, bytes, format, preview, metaSrc);
+    cur.info = await xray(file, cur.bytes, cur.format, cur.preview, cur.metaSrc);
     if (id !== state.op) return;
     if (cur.info.thumbUrl) state.urls.push(cur.info.thumbUrl);
     // The findings come out together, once the picture has been looked at too.
@@ -415,8 +404,76 @@ async function open(file) {
     cur.done?.();
     $("verdict").focus();
   } catch (e) {
-    fail(id, e.message || "This photo couldn't be opened.");
+    const own = (e instanceof PhotoError || e instanceof BrokenFileError) && e.message;
+    fail(id, problemText(e));
   }
+}
+
+// A problem with opening a photo, in the app's own words.
+function problemText(e) {
+  const own = (e instanceof PhotoError || e instanceof BrokenFileError) && e.message;
+  return own ? e.message.replace(/([^.])$/, "$1.") : "This photo couldn't be opened."; // strip.js says its messages without the full stop
+}
+
+// ---------- read a photo ----------
+// Everything Unpin needs to check and save a photo, from its file: the bytes, the format, the copy
+// cleaned in place (when the file can be cleaned without drawing it again), and the picture
+// upright on a canvas. The review of one photo and "Clean all" both start here.
+// live(): whether the result is still wanted; when it isn't, reading stops and gives null.
+// onSize(w, h): the picture's shape from the file's header, before it is decoded.
+// onStatus(text): what a slow step is doing. Throws PhotoError or BrokenFileError for a bad file.
+async function readPhoto(file, { live = () => true, onSize = null, onStatus = null } = {}) {
+  if (file.size > MAX_BYTES) throw new PhotoError(`This file is ${Math.round(file.size / 1e6)} MB. Unpin opens photos up to 80 MB.`);
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  if (!live()) return null;
+  const format = detectFormat(bytes);
+  if (!SUPPORTED.has(format)) throw new PhotoError("This doesn't look like a JPEG, PNG, WebP, HEIC or AVIF photo.");
+
+  // Size from the header first: a small file can still be a huge picture.
+  const head = imageInfo(bytes, format);
+  if (head) checkPixels(head.width, head.height);
+
+  // What exifr reads. WebP metadata goes through a JPEG shell, because exifr can't read WebP.
+  let metaSrc = bytes;
+  let metaPartial = false;
+  if (format === "webp") {
+    const m = webpMetadata(bytes);
+    metaSrc = m ? m.bytes : null;
+    metaPartial = !!m?.partial;
+  }
+
+  let orientation = 1;
+  if (metaSrc) try { orientation = (await exifr.orientation(metaSrc)) || 1; } catch {}
+  if (!Number.isInteger(orientation) || orientation < 1 || orientation > 8) orientation = 1; // 1–8 are the only turns there are
+  if (!live()) return null;
+  // The photo's shape before decoding. EXIF turns of 90° (orientation 5–8) swap the sides;
+  // HEIC and AVIF sizes are already turned (their own irot box).
+  if (head && onSize) {
+    const turned = orientation >= 5 && format !== "heic" && format !== "avif";
+    onSize(turned ? head.height : head.width, turned ? head.width : head.height);
+  }
+
+  let preview = null;
+  let brokenNote = "";
+  try {
+    preview = await stripLossless(bytes, format, { orientation });
+  } catch (e) {
+    preview = null;
+    if (e instanceof BrokenFileError) brokenNote = `${e.message}. The picture will be saved again instead of cleaned in place.`;
+  }
+  // PNG and WebP keep no rotation flag after cleaning; re-save turned pictures upright instead.
+  if (preview && format !== "jpeg" && orientation !== 1) preview = null;
+
+  const src = await decode(file, format, orientation, onStatus);
+  if (!live()) { release(src); return null; }
+  const animated = !!(head?.animated || preview?.animated);
+  return { file, bytes, format, preview, src, orientation, brokenNote, alpha: !!head?.alpha, animated, metaPartial, metaSrc };
+}
+
+// A canvas holds its pixels until it is thrown away; a 64-megapixel one is 256 MB.
+// Shrinking it to nothing gives the memory back at once.
+function release(canvas) {
+  if (canvas) canvas.width = canvas.height = 0;
 }
 
 // Does this browser turn a picture by its EXIF flag while decoding it? Every browser does for JPEG;
@@ -454,18 +511,18 @@ function drawUpright(c, bitmap, o) {
   g.drawImage(bitmap, 0, 0); // an animation gives its first frame
 }
 
-async function decode(file, format, id, orientation = 1) {
+async function decode(file, format, orientation = 1, onStatus = null) {
   let bitmap = null;
   try {
     bitmap = await createImageBitmap(file); // turned by EXIF in some browsers and formats, see above
   } catch {
     if (format === "heic") {
-      if (id === state.op) $("status").textContent = "Opening a HEIC photo (loads a 3 MB decoder once)…";
+      onStatus?.("Opening a HEIC photo (loads a 3 MB decoder once)…");
       const { heicTo } = await import("../vendor/heic-to.js");
       const jpeg = await heicTo({ blob: file, type: "image/jpeg", quality: 0.95 });
       bitmap = await createImageBitmap(jpeg);
     } else {
-      throw new Error("This browser can't open this picture. It may be damaged.");
+      throw new PhotoError("This browser can't open this picture. It may be damaged.");
     }
   }
   // Check again before the full-size canvas: HEIC and AVIF sizes are only known now.
@@ -483,7 +540,7 @@ async function decode(file, format, id, orientation = 1) {
 }
 
 function checkPixels(width, height) {
-  if (width * height > MAX_PIXELS) throw new Error(`This picture is ${Math.round((width * height) / 1e6)} megapixels. Unpin opens up to 64.`);
+  if (width * height > MAX_PIXELS) throw new PhotoError(`This picture is ${Math.round((width * height) / 1e6)} megapixels. Unpin opens up to 64.`);
 }
 
 // ---------- drawing ----------
@@ -983,8 +1040,8 @@ async function renderFindings(cur) {
   renderFormatNote(cur);
 }
 
-function planFor(cur) {
-  return exportPlan({ format: cur.format, lossless: !!cur.preview, animated: cur.animated, alpha: cur.alpha, covering: cur.regions.some((r) => r.on) });
+function planFor(photo, regions = photo.regions) {
+  return exportPlan({ format: photo.format, lossless: !!photo.preview, animated: photo.animated, alpha: photo.alpha, covering: regions.some((r) => r.on) });
 }
 
 function renderFormatNote(cur) {
@@ -1195,29 +1252,17 @@ $("clean").addEventListener("click", async () => {
   // Work on a frozen copy of the boxes: edits made while saving can't change what gets checked.
   const rev = cur.rev;
   const regions = cur.regions.map((r) => ({ ...r }));
-  const active = regions.filter((r) => r.on);
-  const plan = planFor(cur);
-  const outFormat = plan.outFormat;
-  let bytes;
+  let built;
   try {
-    if (plan.mode === "lossless") {
-      bytes = cur.preview.bytes;
-    } else {
-      const canvas = active.length ? redact(cur.src, active) : cur.src;
-      bytes = await canvasToBytes(canvas, `image/${outFormat}`);
-      // A browser may add blocks of its own when saving; keep only the picture.
-      try { bytes = (await stripLossless(bytes, outFormat)).bytes; } catch {}
-    }
+    built = await buildFile(cur, regions);
   } catch (e) {
     if (state.cur === cur) setPhase(cur, cur.phase, `Couldn't save the picture: ${e.message}`);
     return;
   }
   if (state.cur !== cur) return;
-  const ext = { jpeg: "jpg", png: "png", webp: "webp" }[outFormat];
-  const base = $("keepname").checked ? cur.file.name.replace(/\.[^.]+$/, "") : "photo";
-  const name = `${base}-unpinned.${ext}`;
-  const blob = new Blob([bytes], { type: `image/${outFormat}` });
-  const checks = await verify(blob, bytes, outFormat, regions, { codes: !cur.codesProblem, faces: !cur.facesProblem, far: !cur.farProblem });
+  const { bytes, outFormat, blob } = built;
+  const name = cleanName(cur.file.name, outFormat, $("keepname").checked);
+  const checks = await verify(blob, bytes, outFormat, regions, searchedFor(cur));
   if (state.cur !== cur) return;
   setPhase(cur, cur.phase);
   if (cur.rev !== rev) {
@@ -1231,13 +1276,66 @@ $("clean").addEventListener("click", async () => {
   if (!bad) download(blob, name);
 });
 
+// The clean file, made by the plan (js/plan.js) with these boxes covered: the original bytes
+// without their metadata, or the picture drawn again. The same for one photo and for "Clean all".
+async function buildFile(photo, regions) {
+  const plan = planFor(photo, regions);
+  const outFormat = plan.outFormat;
+  let bytes;
+  if (plan.mode === "lossless") {
+    bytes = photo.preview.bytes;
+  } else {
+    const active = regions.filter((r) => r.on);
+    const canvas = active.length ? redact(photo.src, active) : photo.src;
+    try {
+      bytes = await canvasToBytes(canvas, `image/${outFormat}`);
+    } finally {
+      if (canvas !== photo.src) release(canvas);
+    }
+    // A browser may add blocks of its own when saving; keep only the picture.
+    try { bytes = (await stripLossless(bytes, outFormat)).bytes; } catch {}
+  }
+  return { bytes, outFormat, blob: new Blob([bytes], { type: `image/${outFormat}` }) };
+}
+
+// Which searches of the photo worked, for the check of the saved file.
+const searchedFor = (p) => ({ codes: !p.codesProblem, faces: !p.facesProblem, far: !p.farProblem });
+
+// Phones: the system share sheet next to the download, so the clean copy can go straight to
+// Photos (on iPhone: Share, then Save Image) or to a chat. Only on touch screens whose browser
+// can share files; elsewhere there is no button at all. It opens on a tap of its own: the
+// browser allows the share sheet only right after one.
+// files: [{ blob, name }]; say(text) tells a problem where the button is.
+function shareButton(items, text, say = (t) => { $("status").textContent = t; }) {
+  const files = items.map(({ blob, name }) => new File([blob], name, { type: blob.type }));
+  let can = false;
+  try { can = files.length > 0 && touchScreen.matches && !!navigator.canShare?.({ files }); } catch {}
+  if (!can) return null;
+  const b = document.createElement("button");
+  b.type = "button";
+  b.className = "btn btn-gray btn-sm";
+  label(b, "export", text);
+  b.addEventListener("click", async () => {
+    try {
+      await navigator.share({ files });
+    } catch (e) {
+      // Closing the share sheet is not a problem.
+      if (e?.name !== "AbortError") say("The share sheet couldn't open. The download still works.");
+    }
+  });
+  return b;
+}
+
 function download(blob, name) {
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
   a.download = name;
   document.body.append(a);
   a.click();
-  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 2000);
+  a.remove();
+  // Safari on iPhone first asks "Download?" and reads the file only after the answer:
+  // the link must outlive a slow answer.
+  setTimeout(() => URL.revokeObjectURL(a.href), 40000);
 }
 
 // Re-read the file that will be saved: metadata from its bytes, codes from its decoded pixels.
@@ -1280,6 +1378,7 @@ async function verify(blob, bytes, outFormat, regions, searched) {
       c.getContext("2d").drawImage(bmp, 0, 0);
       bmp.close?.();
       const left = await findCodes(c);
+      release(c);
       const r = codeCheck(codeRegions.filter((x) => !x.on), left);
       check.result = r.result;
       if (r.result === "kept") check.note = `${r.kept} left readable, as you chose`;
@@ -1355,6 +1454,10 @@ function showChecks(checks, bad, blob, name) {
     again.addEventListener("click", () => download(blob, name));
     actions.append(again);
   }
+  // The checked file, and only that one, can go to the share sheet too; a file that failed
+  // its check only with the same "anyway" as the download.
+  const share = shareButton([{ blob, name }], bad ? "Share anyway" : "Share");
+  if (share) actions.append(share);
   const back = document.createElement("button");
   back.type = "button";
   back.className = "btn btn-gray btn-sm";
@@ -1365,3 +1468,251 @@ function showChecks(checks, bad, blob, name) {
   showView("after");
   title.focus();
 }
+
+// ---------- clean all: every waiting photo in one go ----------
+// What the review does with its defaults, photo by photo: read it, look for faces (both passes)
+// and codes, blur and cover all of them, save it by the same plan and check it again. One photo
+// at a time, each one's canvases let go before the next, so memory holds only the clean files.
+// They come as one zip. A photo whose check found something is left out of the zip and said so.
+// Stopping, or a full zip (ZIP_LIMIT), leaves the rest waiting, to clean later or one by one.
+
+// Faces and codes, as the review finds them, all at once: codes and near faces together, then the
+// far pass. Like the review, a search that fails is carried into the check as "couldn't check".
+async function findAll(photo, signal, onStatus) {
+  let facesProblem = false, farProblem = false, codesProblem = false;
+  const [codes, near] = await Promise.all([
+    findCodes(photo.src).catch(() => { codesProblem = true; return []; }),
+    findFacesOffPage(photo.src, onStatus, { pass: "near", signal }).catch((e) => {
+      if (signal.aborted) throw e;
+      facesProblem = true;
+      return null;
+    }),
+  ]);
+  const faces = near || [];
+  if (near) {
+    if (signal.aborted) throw stopped();
+    onStatus("Looking for small faces far away…");
+    try {
+      const far = await findFacesOffPage(photo.src, null, { pass: "far", signal });
+      faces.push(...far.filter((f) => !faces.some((r) => sameFace(r, f))));
+    } catch (e) {
+      if (signal.aborted) throw e;
+      farProblem = true;
+    }
+  }
+  return { regions: [...faces, ...codes].map((b) => ({ ...b, on: true })), codesProblem, facesProblem, farProblem };
+}
+const stopped = () => new DOMException("Stopped", "AbortError");
+
+// Clean one photo with the defaults. Gives what became of it; the clean file is in `blob`.
+async function cleanOne(file, signal, onStatus) {
+  let photo = null;
+  try {
+    onStatus("Reading the file…");
+    photo = await readPhoto(file, { live: () => !signal.aborted, onStatus });
+    if (!photo) throw stopped();
+    onStatus("Looking for faces and codes…");
+    const found = await findAll(photo, signal, onStatus);
+    if (signal.aborted) throw stopped();
+    onStatus("Cleaning and checking…");
+    const { bytes, outFormat, blob } = await buildFile(photo, found.regions);
+    const checks = await verify(blob, bytes, outFormat, found.regions, searchedFor(found));
+    const faces = found.regions.filter((r) => r.kind === "face").length, codes = found.regions.length - faces;
+    return { file, outFormat, blob, crc: crc32(bytes), checks, outcome: batchOutcome(checks), faces, codes };
+  } catch (e) {
+    if (e?.name === "AbortError" || signal.aborted) throw stopped();
+    return { file, outcome: "failed", problem: problemText(e) };
+  } finally {
+    release(photo?.src);
+  }
+}
+
+const mb = (n) => (n >= 1e9 ? `${(n / 1e9).toFixed(1)} GB` : n >= 1e7 ? `${Math.round(n / 1e6)} MB` : `${Math.max(0.1, n / 1e6).toFixed(1)} MB`);
+const ZIP_NAME = "photos-unpinned.zip";
+let batchMascot = null;
+
+function showBatch() {
+  leaveReview();
+  document.body.classList.add("working");
+  $("hero").hidden = true;
+  $("error").hidden = true;
+  $("result").hidden = true;
+  $("batch").hidden = false;
+  window.scrollTo({ top: 0 });
+}
+function clearBatch() {
+  state.batch?.abort();
+  state.batch = null;
+  batchMascot?.stop();
+  batchMascot = null;
+  $("batch").hidden = true;
+}
+
+async function cleanAll(files) {
+  if (!files.length) return;
+  clearBatch();
+  state.queue = []; // the batch has them now; what it doesn't get to goes back
+  const id = ++state.op;
+  const ctrl = new AbortController();
+  state.batch = ctrl;
+  showBatch();
+  const keep = $("keepname").checked;
+  const total = files.length;
+  const done = [];
+  let size = 0, stop = null; // stop: why the batch ended early, "stopped" or "full"
+  $("batch-title").textContent = `Cleaning ${total} photos`;
+  $("batch-sub").textContent = "Each photo is cleaned as found: faces blurred, codes covered, the hidden data removed, then checked again.";
+  $("batch-list").replaceChildren();
+  $("batch-progress").hidden = false;
+  $("batch-bar").max = total;
+  $("batch-bar").value = 0;
+  const stopBtn = document.createElement("button");
+  stopBtn.type = "button";
+  stopBtn.className = "btn btn-gray btn-sm";
+  label(stopBtn, "x", "Stop");
+  stopBtn.addEventListener("click", () => ctrl.abort());
+  $("batch-actions").replaceChildren(stopBtn);
+  $("batch-title").focus();
+
+  let i = 0;
+  for (; i < files.length; i++) {
+    const file = files[i];
+    // A zip that this photo would take past the limit is closed first (its size after cleaning is
+    // about the same; checked again below).
+    if (size > 0 && size + Math.min(file.size, MAX_BYTES) > ZIP_LIMIT) { stop = "full"; break; }
+    const say = (t) => { if (id === state.op) $("batch-status").textContent = `Photo ${i + 1} of ${total}: ${t[0].toLowerCase()}${t.slice(1)}`; };
+    let r;
+    try {
+      r = await cleanOne(file, ctrl.signal, say);
+    } catch {
+      if (id !== state.op) return; // another photo was opened, or home: nothing to show
+      stop = "stopped";
+      break;
+    }
+    if (id !== state.op) return;
+    const inZip = r.blob && r.outcome !== "bad";
+    if (inZip && size > 0 && size + r.blob.size > ZIP_LIMIT) { stop = "full"; break; }
+    if (inZip) size += r.blob.size;
+    r.at = i + 1;
+    done.push(r);
+    $("batch-bar").value = i + 1;
+    $("batch-list").append(batchRow(r));
+  }
+  state.batch = null;
+  state.queue = files.slice(i); // not cleaned: waiting again
+  finishBatch(done, total, size, stop, keep);
+}
+
+// One photo's line in the list: its name on this device, and what became of it.
+function batchRow(r) {
+  const li = document.createElement("li");
+  const what = document.createElement("div");
+  const name = document.createElement("strong");
+  name.textContent = r.file.name || "Photo";
+  const text = document.createElement("span");
+  const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+  const covered = r.blob && [r.faces && `${plural(r.faces, "face", "faces")} blurred`, r.codes && `${plural(r.codes, "code", "codes")} covered`].filter(Boolean).join(", ");
+  const extra = covered ? ` ${covered[0].toUpperCase()}${covered.slice(1)}.` : "";
+  let iconName;
+  if (r.outcome === "clean") { li.className = "ok"; iconName = "check-circle"; text.textContent = `Clean and checked.${extra}`; }
+  else if (r.outcome === "unchecked") {
+    li.className = "unknown"; iconName = "question";
+    text.textContent = `Saved. Couldn't check: ${r.checks.filter((c) => c.result === "unknown").map((c) => c.name).join(", ")}.${extra}`;
+  } else if (r.outcome === "bad") {
+    li.className = "bad"; iconName = "x-circle";
+    text.textContent = `Not saved. Still in the file: ${r.checks.filter((c) => c.result === "bad").map((c) => c.name).join(", ")}.`;
+  } else { li.className = "bad"; iconName = "x-circle"; text.textContent = `Not saved. ${r.problem}`; }
+  what.append(name, text);
+  li.append(icon(iconName), what);
+  r.row = li;
+  enter(li, 0);
+  return li;
+}
+
+function finishBatch(done, total, size, stop, keep) {
+  $("batch-progress").hidden = true;
+  const built = done.filter((d) => d.blob);
+  const names = batchNames(built.map((d) => ({ original: d.file.name, outFormat: d.outFormat, at: d.at })), keep, total);
+  built.forEach((d, k) => { d.name = names[k]; });
+  const inZip = built.filter((d) => d.outcome !== "bad");
+  const unchecked = inZip.some((d) => d.outcome === "unchecked");
+  const left = state.queue.length;
+  const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+
+  // A photo that failed its check can still be had, with an "anyway", never inside the zip.
+  for (const d of built) {
+    if (d.outcome !== "bad") continue;
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "btn btn-gray btn-sm";
+    label(b, "download-simple", "Download anyway");
+    b.addEventListener("click", () => download(d.blob, d.name));
+    d.row.querySelector("div").append(b);
+  }
+
+  const zip = inZip.length ? new Blob(zipParts(inZip.map((d) => ({ name: d.name, data: d.blob, size: d.blob.size, crc: d.crc }))), { type: "application/zip" }) : null;
+  $("batch-title").textContent = !done.length && stop === "stopped" ? "Stopped"
+    : !inZip.length ? "No photo was saved"
+    : inZip.length === done.length && !left ? (unchecked ? "Downloaded, mostly checked" : "Downloaded and checked")
+    : `${inZip.length} of ${total} photos downloaded`;
+  const lines = [];
+  if (zip) lines.push(`Saved as ${ZIP_NAME} (${mb(zip.size)}). Unpin read each file again.`);
+  if (stop === "full") lines.push(`The zip is full: one zip holds up to ${mb(ZIP_LIMIT)} of photos. ${plural(left, "photo is", "photos are")} still waiting.`);
+  else if (stop === "stopped" && left) lines.push(`Stopped. ${plural(left, "photo wasn't", "photos weren't")} cleaned and still ${left === 1 ? "waits" : "wait"}.`);
+  $("batch-sub").textContent = lines.join(" ");
+
+  const actions = [];
+  const button = (cls, iconName, text, onClick) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = cls;
+    label(b, iconName, text);
+    b.addEventListener("click", onClick);
+    actions.push(b);
+    return b;
+  };
+  if (left) {
+    button("btn btn-yellow btn-sm", "stack", left === 1 ? "Clean the last one" : `Clean the other ${left}`, () => cleanAll(state.queue));
+    button("btn btn-gray btn-sm", "arrow-right", "One by one", () => { clearBatch(); open(state.queue.shift()); });
+  }
+  if (zip) button("btn btn-gray btn-sm", "download-simple", "Download again", () => download(zip, ZIP_NAME));
+  const share = shareButton(inZip.map((d) => ({ blob: d.blob, name: d.name })), "Share the photos", (t) => { $("batch-sub").textContent = t; });
+  if (share) actions.push(share);
+  button(left ? "btn btn-gray btn-sm" : "btn btn-yellow btn-sm", "upload-simple", "Choose more photos", () => { home(); $("file").click(); });
+  $("batch-actions").replaceChildren(...actions);
+
+  batchMascot?.stop();
+  const host = $("mascot-batch");
+  host.replaceChildren();
+  batchMascot = afterScene(host, built.some((d) => d.outcome === "bad") || done.some((d) => d.outcome === "failed") ? "bad" : unchecked || !zip ? "unknown" : "clean");
+  $("batch-title").focus();
+  if (zip) download(zip, ZIP_NAME);
+}
+
+// ---------- photos shared from another app ----------
+// On Android, Unpin installed from the browser shows up in the share sheet (share_target in
+// manifest.webmanifest). The service worker keeps the shared photos on the device and opens the
+// page with ?shared; they are taken from its cache here and opened like dropped files.
+const SHARED = "unpin-shared";
+async function receiveShared() {
+  history.replaceState(history.state, "", location.pathname); // a reload starts afresh
+  const files = [];
+  try {
+    const cache = await caches.open(SHARED);
+    const keys = await cache.keys();
+    const at = (req) => Number(req.url.split("/").pop()) || 0;
+    for (const req of keys.sort((a, b) => at(a) - at(b))) {
+      const res = await cache.match(req);
+      if (!res) continue;
+      let name = "photo";
+      try { name = decodeURIComponent(res.headers.get("X-Name") || name); } catch {}
+      files.push(new File([await res.blob()], name, { type: res.headers.get("Content-Type") || "" }));
+    }
+    await caches.delete(SHARED);
+  } catch {}
+  if (files.length) return start(files);
+  document.body.classList.add("working");
+  $("hero").hidden = true;
+  fail(state.op, "The shared photo didn't arrive. Choose it here instead.");
+}
+if (new URLSearchParams(location.search).has("shared") && "caches" in window) receiveShared();

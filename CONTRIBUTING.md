@@ -22,6 +22,8 @@ npm run preview
 
 `npm run preview` serves the site at http://127.0.0.1:8000.
 
+`npm run test:e2e` runs the main path in headless Chromium: a photo in, a clean file out, and no request to any other site. Install the browser once with `npx playwright install chromium`.
+
 - The tests run before every deploy and must pass. A change to how files are read or cleaned needs a test in `tests/`.
 - The page connects to no other server, and its Content Security Policy enforces that. Keep it that way: no analytics, no third-party fonts or scripts.
 - The libraries in `vendor/` are copied there by `npm run vendor`. Don't edit them by hand: `scripts/vendor.mjs` also applies a security patch to `vendor/exifr.mjs` and stops if the library has changed.

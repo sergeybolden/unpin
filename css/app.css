@@ -4,23 +4,100 @@
   font-weight: 300 900;
   font-display: swap;
 }
+/* Colours. Light first; the dark theme below follows the system setting (no switch on the page).
+   --page: the page; --soft: panels and cards on the page; --surface: cards inside a panel, the
+   toolbar, the popover. Text colours pass WCAG AA (4.5:1) on all three, in both themes;
+   --warn-text is --warn darkened for text, --warn alone is for icons. The yellow button keeps
+   dark text in both. Colours drawn on the photo itself (box outlines, their buttons) don't change. */
 :root {
   --text: #222222;
   --muted: #5f6368;
   --line: #ececec;
   --soft: #f5f5f3;
   --page: #ffffff;
+  --surface: #ffffff;
   --yellow: #ffdd00;
   --yellow-hover: #f5d300;
+  --on-yellow: #222222;
   --danger: #d93036;
   --warn: #c77700;
+  --warn-text: #a35f00;
   --ok: #1f7a45;
+  --ai: #7a5cd6;
   --map-sea: #eef3f6;
   --map-land: #e2ddcf;
   --map-coast: #c9c1ad;
-  --surface: #ffffff;
-  --focus: 0 0 0 3px #fff, 0 0 0 6px #222;
-  color-scheme: light;
+  --btn: #f0f0ee;
+  --btn-line: #e1e1de;
+  --btn-hover: #e9e9e6;
+  --pressed: #e8f0fe;
+  --pressed-text: #1d4ed8;
+  --tip: #1f2023;
+  --tip-text: #ffffff;
+  --placeholder: #e9e9e6;
+  --sk-map: #e9e8e3;
+  --sk-bit: #ecebe7;
+  --shimmer: rgba(255, 255, 255, .65);
+  --glass: rgba(255, 255, 255, .88);
+  --frost: rgba(255, 255, 255, .5);
+  --page-glow: rgba(255, 255, 255, .92);
+  --shadow: rgba(0, 0, 0, .12);
+  --final: 255, 246, 191; /* the last call's light yellow, as r, g, b */
+  --final-a: 1;
+  --wordmark: #efeee8;
+  --gh-text: #1f2328;
+  --gh-bg: #f6f8fa;
+  --gh-hover: #eff2f5;
+  --gh-line: #d1d9e0;
+  --gh-count: #ffffff;
+  --gh-link: #0969da;
+  --gh-star: #59636e;
+  --focus: 0 0 0 3px var(--page), 0 0 0 6px var(--text);
+  color-scheme: light dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --text: #ececea;
+    --muted: #a4a8ae;
+    --line: #2f3136;
+    --soft: #1c1d21;
+    --page: #121316;
+    --surface: #26282d;
+    --yellow-hover: #ffe633;
+    --danger: #ff7a7a;
+    --warn: #f2a541;
+    --warn-text: #f2a541;
+    --ok: #5fd394;
+    --ai: #a993ff;
+    --map-sea: #17212a;
+    --map-land: #34332e;
+    --map-coast: #4d4a42;
+    --btn: #2c2e33;
+    --btn-line: #3a3d43;
+    --btn-hover: #35383e;
+    --pressed: #24324d;
+    --pressed-text: #9cc0ff;
+    --tip: #e9e9e7;
+    --tip-text: #1f2023;
+    --placeholder: #2a2c31;
+    --sk-map: #2a2c31;
+    --sk-bit: #34363c;
+    --shimmer: rgba(255, 255, 255, .06);
+    --glass: rgba(30, 32, 36, .88);
+    --frost: rgba(18, 19, 22, .5);
+    --page-glow: rgba(18, 19, 22, .92);
+    --shadow: rgba(0, 0, 0, .4);
+    --final: 255, 221, 0;
+    --final-a: .12;
+    --wordmark: #1d1e22;
+    --gh-text: #f0f6fc;
+    --gh-bg: #212830;
+    --gh-hover: #262c36;
+    --gh-line: #3d444d;
+    --gh-count: #151b23;
+    --gh-link: #4493f8;
+    --gh-star: #9198a1;
+  }
 }
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; }
@@ -37,25 +114,26 @@ a:focus-visible, button:focus-visible, summary:focus-visible, [tabindex]:focus-v
 .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; font-weight: 800; font-size: 22px; letter-spacing: -0.02em; }
 
 /* GitHub star button, styled like GitHub's own */
-.gh { display: inline-flex; align-items: stretch; text-decoration: none; font: 600 14px/1 -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif; color: #1f2328; border-radius: 6px; box-shadow: 0 1px 0 rgba(31, 35, 40, 0.04); }
-.gh-main { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; background: #f6f8fa; border: 1px solid #d1d9e0; border-radius: 6px; transition: background .15s; }
+.gh { display: inline-flex; align-items: stretch; text-decoration: none; font: 600 14px/1 -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif; color: var(--gh-text); border-radius: 6px; box-shadow: 0 1px 0 rgba(31, 35, 40, 0.04); }
+.gh-main { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; background: var(--gh-bg); border: 1px solid var(--gh-line); border-radius: 6px; transition: background .15s; }
 .gh:has(.gh-count:not([hidden])) .gh-main { border-radius: 6px 0 0 6px; }
-.gh-count { display: inline-flex; align-items: center; padding: 7px 10px; background: #fff; border: 1px solid #d1d9e0; border-left: 0; border-radius: 0 6px 6px 0; font-variant-numeric: tabular-nums; }
+.gh-count { display: inline-flex; align-items: center; padding: 7px 10px; background: var(--gh-count); border: 1px solid var(--gh-line); border-left: 0; border-radius: 0 6px 6px 0; font-variant-numeric: tabular-nums; }
 .gh-count[hidden] { display: none; }
-.gh:hover .gh-main { background: #eff2f5; }
-.gh:hover .gh-count { color: #0969da; }
-.gh-star { color: #59636e; }
+.gh:hover .gh-main { background: var(--gh-hover); }
+.gh:hover .gh-count { color: var(--gh-link); }
+.gh-star { color: var(--gh-star); }
 
 main { max-width: 1180px; margin: 0 auto; padding: 0 24px; }
 
 /* buttons */
-.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; font: 700 20px/1.1 "Figtree", sans-serif; padding: 20px 34px; border-radius: 999px; border: 0; cursor: pointer; color: #222; text-decoration: none; transition: transform .12s, background .15s; text-align: center; }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; font: 700 20px/1.1 "Figtree", sans-serif; padding: 20px 34px; border-radius: 999px; border: 0; cursor: pointer; color: var(--text); text-decoration: none; transition: transform .12s, background .15s; text-align: center; }
+.btn[hidden] { display: none; } /* display above would show it */
 .btn:active { transform: scale(.98); }
 .btn:disabled { cursor: progress; opacity: .6; transform: none; }
-.btn-yellow { background: var(--yellow); }
+.btn-yellow { background: var(--yellow); color: var(--on-yellow); }
 .btn-yellow:hover:not(:disabled) { background: var(--yellow-hover); }
-.btn-gray { background: #f0f0ee; border: 1px solid #e1e1de; font-weight: 600; font-size: 17px; padding: 14px 24px; }
-.btn-gray:hover { background: #e9e9e6; }
+.btn-gray { background: var(--btn); border: 1px solid var(--btn-line); font-weight: 600; font-size: 17px; padding: 14px 24px; }
+.btn-gray:hover { background: var(--btn-hover); }
 .btn-sm { font-size: 15px; padding: 9px 16px; }
 .btn-wide { width: 100%; }
 
@@ -93,7 +171,7 @@ h1 { font-weight: 800; font-size: clamp(40px, 5.4vw, 66px); line-height: 1.02; l
 /* hero demo on a real photo */
 /* On the work screen a photo can still be dropped anywhere: the whole page is outlined. */
 body.working.dragging main { box-shadow: inset 0 0 0 4px var(--yellow); border-radius: 24px; }
-.demo-photo { position: relative; line-height: 0; border-radius: 16px; overflow: hidden; box-shadow: 0 12px 32px rgba(0, 0, 0, .12); }
+.demo-photo { position: relative; line-height: 0; border-radius: 16px; overflow: hidden; box-shadow: 0 12px 32px var(--shadow); }
 .demo-photo img { display: block; width: 100%; height: auto; }
 .mark { position: absolute; left: var(--x); top: var(--y); width: var(--w); height: var(--h); border: 2px solid var(--mc); border-radius: 6px; line-height: 1.2; }
 .mark b { position: absolute; left: 50%; bottom: calc(100% + 6px); transform: translateX(-50%); display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; font-size: 13px; font-weight: 700; color: #fff; background: var(--mc); border-radius: 999px; padding: 3px 9px; }
@@ -111,9 +189,9 @@ body.working.dragging main { box-shadow: inset 0 0 0 4px var(--yellow); border-r
 /* A frosted backing over the bottom of the photo, under the card and the button, so they
    don't sit on the busy pavement. It fades out upwards; the photo still shows through,
    so its edge stays visible on the white page. Drawn before the marks and the card, so it stays under them. */
-.demo-photo::before { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 50%; background: rgba(255, 255, 255, .5); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); -webkit-mask-image: linear-gradient(to top, #000 55%, transparent); mask-image: linear-gradient(to top, #000 55%, transparent); pointer-events: none; }
+.demo-photo::before { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 50%; background: var(--frost); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); -webkit-mask-image: linear-gradient(to top, #000 55%, transparent); mask-image: linear-gradient(to top, #000 55%, transparent); pointer-events: none; }
 .demo-over { position: absolute; left: 10px; right: 10px; bottom: 10px; display: flex; flex-direction: column; gap: 8px; }
-.demo-info { padding: 10px 14px 6px; border-radius: 14px; background: rgba(255, 255, 255, .9); backdrop-filter: blur(8px); box-shadow: 0 4px 16px rgba(0, 0, 0, .12); line-height: 1.3; }
+.demo-info { padding: 10px 14px 6px; border-radius: 14px; background: var(--glass); backdrop-filter: blur(8px); box-shadow: 0 4px 16px var(--shadow); line-height: 1.3; }
 .facts-title { display: flex; align-items: center; gap: 6px; font-size: 14px; margin: 0; padding: 2px 0 7px; border-bottom: 1px solid var(--line); }
 .facts-title .ic { width: 17px; height: 17px; }
 .facts-title b { font-weight: 700; }
@@ -127,8 +205,8 @@ body.working.dragging main { box-shadow: inset 0 0 0 4px var(--yellow); border-r
 .fact span { color: var(--muted); overflow-wrap: anywhere; }
 /* Its own light button on the photo, under the card and as wide: white like the card, so the
    yellow "Choose a photo" stays the one main button. The frosted backing keeps it readable. */
-.demo-try { width: 100%; padding: 12px 16px; font-size: 15px; color: var(--text); background: #fff; box-shadow: 0 4px 16px rgba(0, 0, 0, .14); }
-.demo-try:hover { background: #f4f4f2; }
+.demo-try { width: 100%; padding: 12px 16px; font-size: 15px; color: var(--text); background: var(--surface); box-shadow: 0 4px 16px var(--shadow); }
+.demo-try:hover { background: var(--soft); }
 
 /* The demo plays once, like Unpin at work: a scan line passes down the photo twice, each pass
    to the very bottom; only then the boxes lock on one by one, then the backing, the card row by
@@ -164,8 +242,38 @@ body.working.dragging main { box-shadow: inset 0 0 0 4px var(--yellow); border-r
 body.working .landing { display: none; }
 
 .error { max-width: 640px; margin: 48px auto; text-align: center; background: var(--soft); border-radius: 24px; padding: 36px 28px; }
-.error h2 { font-size: 30px; margin: 0 0 10px; }
+.error h1, .error h2 { font-size: 30px; margin: 0 0 10px; }
 .error p { margin: 0 0 24px; }
+.error-actions { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; }
+
+/* Clean all: one panel, like the error screen, with the list of photos in a card. */
+.batch { position: relative; max-width: 720px; margin: 32px auto 48px; background: var(--soft); border-radius: 24px; padding: 28px; }
+.batch h2 { font-size: 30px; line-height: 1.1; margin: 4px 84px 10px 4px; }
+.batch h2:focus { outline: none; box-shadow: none; }
+.batch-sub { margin: 0 84px 16px 4px; color: var(--muted); font-size: 16px; }
+.batch-sub:empty { display: none; }
+.mascot-batch { position: absolute; top: 18px; right: 22px; width: 76px; }
+.batch-progress { margin: 0 4px 16px; }
+.batch-progress[hidden] { display: none; }
+.batch-progress p { margin: 8px 0 0; }
+.batch progress { display: block; width: 100%; height: 8px; border: 0; border-radius: 999px; overflow: hidden; background: var(--line); color: var(--yellow); appearance: none; }
+.batch progress::-webkit-progress-bar { background: var(--line); }
+.batch progress::-webkit-progress-value { background: var(--yellow); transition: width .3s; }
+.batch progress::-moz-progress-bar { background: var(--yellow); }
+.batch-list { list-style: none; margin: 0 0 16px; padding: 4px 16px; background: var(--surface); border-radius: 18px; }
+.batch-list:empty { display: none; }
+.batch-list li { display: flex; gap: 10px; align-items: flex-start; padding: 10px 0; }
+.batch-list li + li { border-top: 1px solid var(--line); }
+.batch-list li > .ic { width: 20px; height: 20px; margin-top: 2px; }
+.batch-list li.ok > .ic { color: var(--ok); } .batch-list li.unknown > .ic { color: var(--warn); } .batch-list li.bad > .ic { color: var(--danger); }
+.batch-list div { min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
+.batch-list strong { font-size: 16px; overflow-wrap: anywhere; }
+.batch-list span { font-size: 15px; color: var(--muted); }
+.batch-list li.bad span { color: var(--danger); }
+.batch-list .btn { margin-top: 6px; }
+.batch-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+/* In the bar over the photo: at its end, apart from the way through one by one. */
+.bar .clean-all { margin-left: auto; }
 
 /* result */
 .result { padding: 20px 0 40px; }
@@ -207,15 +315,15 @@ body.fullscreen .fs-close .ic { width: 22px; height: 22px; }
 .frame canvas { display: block; max-width: 100%; height: auto; border-radius: 8px; }
 /* "Add a box" is on: the photo is outlined and waits for a drag. */
 .stage.drawing .frame { box-shadow: 0 0 0 3px #3b82f6, 0 8px 24px rgba(0, 0, 0, .10); }
-.toolbar { position: relative; display: flex; align-items: center; gap: 2px; width: fit-content; margin: 14px auto 0; padding: 4px; background: #fff; border-radius: 14px; box-shadow: 0 1px 2px rgba(0, 0, 0, .06), 0 4px 14px rgba(0, 0, 0, .08); }
+.toolbar { position: relative; display: flex; align-items: center; gap: 2px; width: fit-content; margin: 14px auto 0; padding: 4px; background: var(--surface); border-radius: 14px; box-shadow: 0 1px 2px rgba(0, 0, 0, .06), 0 4px 14px rgba(0, 0, 0, .08); }
 .tool { position: relative; width: 40px; height: 40px; display: grid; place-items: center; padding: 0; border: 0; border-radius: 10px; background: none; color: var(--text); cursor: pointer; transition: background .12s; }
 .tool .ic { width: 21px; height: 21px; }
 .tool:hover { background: var(--soft); }
-.tool[aria-pressed="true"] { background: #e8f0fe; color: #1d4ed8; }
+.tool[aria-pressed="true"] { background: var(--pressed); color: var(--pressed-text); }
 .tool:focus-visible { border-radius: 10px; }
 .tool-sep { width: 1px; height: 24px; margin: 0 4px; background: var(--line); }
 /* Tooltip with the tool's name, above the button, on hover and keyboard focus. */
-.tool[data-tip]::after { content: attr(data-tip); position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%) translateY(4px); padding: 5px 9px; border-radius: 7px; background: #1f2023; color: #fff; font: 600 13px/1.2 "Figtree", sans-serif; white-space: nowrap; opacity: 0; pointer-events: none; transition: opacity .12s, transform .12s; z-index: 6; }
+.tool[data-tip]::after { content: attr(data-tip); position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%) translateY(4px); padding: 5px 9px; border-radius: 7px; background: var(--tip); color: var(--tip-text); font: 600 13px/1.2 "Figtree", sans-serif; white-space: nowrap; opacity: 0; pointer-events: none; transition: opacity .12s, transform .12s; z-index: 6; }
 .tool[data-tip]:hover::after, .tool[data-tip]:focus-visible::after { opacity: 1; transform: translateX(-50%); }
 @media (pointer: coarse) { .tool[data-tip]::after { display: none; } .tool { width: 46px; height: 46px; } }
 /* A finger swipe on the photo scrolls the page; the script stops that only when the finger lands
@@ -234,7 +342,7 @@ body.fullscreen .fs-close .ic { width: 22px; height: 22px; }
 .frame.scanning .scanline::before { animation: sweep 1.15s cubic-bezier(.45, 0, .55, 1) infinite; }
 .frame.scanning .scanline.restart::before { animation: none; } /* the script restarts the pass */
 /* Before the picture is decoded, the frame already has its shape (from the file's header). */
-.frame.scanning #photo { background: #e9e9e6; }
+.frame.scanning #photo { background: var(--placeholder); }
 .frame.scanning .scanline::after { content: ""; position: absolute; inset: 0; background: rgba(20, 22, 26, .12); }
 @keyframes sweep { to { transform: translateY(457%); } }
 
@@ -266,7 +374,7 @@ body.fullscreen .fs-close .ic { width: 22px; height: 22px; }
    (above the button by the popover's bottom edge; with .below, under it by its top edge).
    Where the browser has no popovers it stays hidden. */
 .tools-help { display: none; }
-.tools-help:popover-open { display: block; position: fixed; inset: auto auto var(--y) var(--x); width: min(340px, calc(100vw - 24px)); box-sizing: border-box; margin: 0; padding: 14px 16px; border: 0; border-radius: 16px; background: #fff; color: var(--muted); font-size: 15px; line-height: 1.45; box-shadow: 0 2px 6px rgba(0, 0, 0, .08), 0 16px 40px rgba(0, 0, 0, .16); animation: help-in .18s ease-out; }
+.tools-help:popover-open { display: block; position: fixed; inset: auto auto var(--y) var(--x); width: min(340px, calc(100vw - 24px)); box-sizing: border-box; margin: 0; padding: 14px 16px; border: 0; border-radius: 16px; background: var(--surface); color: var(--muted); font-size: 15px; line-height: 1.45; box-shadow: 0 2px 6px rgba(0, 0, 0, .08), 0 16px 40px rgba(0, 0, 0, .16); animation: help-in .18s ease-out; }
 .tools-help.below:popover-open { inset: var(--y) auto auto var(--x); }
 .tools-help p { display: flex; gap: 10px; align-items: flex-start; margin: 0; }
 .tools-help p + p { margin-top: 10px; }
@@ -274,7 +382,7 @@ body.fullscreen .fs-close .ic { width: 22px; height: 22px; }
 .tools-help b { color: var(--text); font-weight: 600; }
 @keyframes help-in { from { opacity: 0; transform: translateY(4px); } }
 @media (prefers-reduced-motion: reduce) { .tools-help:popover-open { animation: none; } }
-#help.open { background: #e8f0fe; color: #1d4ed8; }
+#help.open { background: var(--pressed); color: var(--pressed-text); }
 #help.open::after { display: none; } /* no hover name under the open popover */
 /* Buttons on the boxes. The layer lets drags through to the photo; only the buttons take clicks. */
 .marks { position: absolute; inset: 0; pointer-events: none; line-height: 1.2; }
@@ -289,13 +397,13 @@ body.fullscreen .fs-close .ic { width: 22px; height: 22px; }
 .box-x.show, .box-x:focus-visible, .mark-area:focus-visible + .box-x { opacity: 1; transform: none; pointer-events: auto; }
 .box-x.show:hover { transform: scale(1.1); }
 .box-x:focus-visible { box-shadow: 0 0 0 2px #fff, 0 0 0 5px #222; border-radius: 50%; }
-.box-x.face { background: #e08a00; } .box-x.code { background: var(--danger); } .box-x.hand { background: #3b82f6; }
+.box-x.face { background: #e08a00; } .box-x.code { background: #d93036; } .box-x.hand { background: #3b82f6; }
 .box-x.off { background: #fff; color: #222; box-shadow: 0 2px 6px rgba(0, 0, 0, .3); }
 @media (pointer: coarse) { .box-x { width: 34px; height: 34px; } .box-x .ic { width: 17px; height: 17px; } }
 h2 { font-weight: 800; letter-spacing: -0.03em; }
 .panel h2 { font-size: 30px; line-height: 1.1; margin: 4px 4px 16px; }
 .findings { list-style: none; padding: 0; margin: 0 0 14px; display: flex; flex-direction: column; gap: 10px; }
-.finding { display: flex; gap: 12px; align-items: flex-start; background: #fff; border-radius: 18px; padding: 14px 16px; }
+.finding { display: flex; gap: 12px; align-items: flex-start; background: var(--surface); border-radius: 18px; padding: 14px 16px; }
 .finding strong { display: block; font-size: 17px; font-weight: 700; }
 .finding p { margin: 2px 0 0; color: var(--muted); font-size: 16px; overflow-wrap: anywhere; }
 .finding-ic { flex: none; color: var(--muted); margin-top: 1px; }
@@ -326,31 +434,31 @@ h2 { font-weight: 800; letter-spacing: -0.03em; }
   .map-pulse::after { display: none; }
 }
 /* Labels on the map: what and where at the top, the nearest town at the bottom. The pin sits in the middle. */
-.map-label { position: absolute; left: 10px; max-width: calc(100% - 20px); padding: 8px 12px; border-radius: 12px; background: rgba(255, 255, 255, .88); backdrop-filter: blur(4px); box-shadow: 0 1px 3px rgba(0, 0, 0, .08); line-height: 1.35; }
+.map-label { position: absolute; left: 10px; max-width: calc(100% - 20px); padding: 8px 12px; border-radius: 12px; background: var(--glass); backdrop-filter: blur(4px); box-shadow: 0 1px 3px rgba(0, 0, 0, .08); line-height: 1.35; }
 .map-label[hidden] { display: none; }
 .map-where { top: 10px; }
 .map-where strong { display: flex; align-items: center; gap: 6px; font-size: 15px; }
 .map-where strong .ic { width: 17px; height: 17px; color: var(--danger); }
 .map-where span { display: block; margin-top: 2px; font-size: 13px; color: var(--muted); overflow-wrap: anywhere; }
 .map-near { bottom: 10px; font-size: 14px; font-weight: 700; }
-.map-note { position: absolute; right: 10px; bottom: 10px; padding: 3px 8px; border-radius: 999px; background: rgba(255, 255, 255, .75); font-size: 12px; color: var(--muted); cursor: help; }
+.map-note { position: absolute; right: 10px; bottom: 10px; padding: 3px 8px; border-radius: 999px; background: var(--glass); font-size: 12px; color: var(--muted); cursor: help; }
 .actionbar { display: flex; flex-direction: column; gap: 8px; align-items: center; }
 .format-note:empty { display: none; }
 .keepname { font-size: 15px; color: var(--muted); display: flex; gap: 8px; align-items: center; cursor: pointer; }
-.keepname input { accent-color: #222; width: 16px; height: 16px; }
+.keepname input { accent-color: var(--text); width: 16px; height: 16px; }
 /* The check report takes the place of the findings, in the same layout. */
 /* While the photo is being checked: placeholders in the shape of the findings, with a soft shimmer.
    The real findings are already filled in underneath and replace them all at once. */
 .skeleton { display: none; flex-direction: column; gap: 10px; margin-bottom: 14px; }
 #report.pending .skeleton { display: flex; }
 #report.pending > :not(.skeleton):not(#verdict) { display: none; }
-.sk { position: relative; overflow: hidden; border-radius: 18px; background: #fff; }
-.sk-map { height: 170px; background: #e9e8e3; }
+.sk { position: relative; overflow: hidden; border-radius: 18px; background: var(--surface); }
+.sk-map { height: 170px; background: var(--sk-map); }
 .sk-card { display: grid; grid-template-columns: 22px 1fr; column-gap: 12px; row-gap: 8px; padding: 16px; }
-.sk-card i { grid-row: span 2; width: 22px; height: 22px; border-radius: 50%; background: #ecebe7; }
-.sk-card b { height: 12px; border-radius: 6px; background: #ecebe7; }
+.sk-card i { grid-row: span 2; width: 22px; height: 22px; border-radius: 50%; background: var(--sk-bit); }
+.sk-card b { height: 12px; border-radius: 6px; background: var(--sk-bit); }
 .sk-card b.short { width: 60%; }
-.sk::after { content: ""; position: absolute; inset: 0; transform: translateX(-100%); background: linear-gradient(90deg, rgba(255, 255, 255, 0), rgba(255, 255, 255, .65), rgba(255, 255, 255, 0)); animation: shimmer 1.3s ease-in-out infinite; }
+.sk::after { content: ""; position: absolute; inset: 0; transform: translateX(-100%); background: linear-gradient(90deg, transparent, var(--shimmer), transparent); animation: shimmer 1.3s ease-in-out infinite; }
 .sk:nth-child(2)::after { animation-delay: .1s; } .sk:nth-child(3)::after { animation-delay: .2s; } .sk:nth-child(4)::after { animation-delay: .3s; }
 @keyframes shimmer { to { transform: translateX(100%); } }
 @media (prefers-reduced-motion: reduce) { .sk::after { animation: none; display: none; } }
@@ -358,12 +466,12 @@ h2 { font-weight: 800; letter-spacing: -0.03em; }
 /* Headings get focus from the script only, to move screen readers there: no ring. */
 .after h2:focus, #verdict:focus { outline: none; box-shadow: none; }
 .after-sub { margin: -8px 4px 14px; color: var(--muted); font-size: 16px; overflow-wrap: anywhere; }
-.after ul { list-style: none; margin: 0 0 14px; padding: 8px 16px; background: #fff; border-radius: 18px; }
+.after ul { list-style: none; margin: 0 0 14px; padding: 8px 16px; background: var(--surface); border-radius: 18px; }
 .after li { display: flex; gap: 10px; align-items: flex-start; padding: 7px 0; font-size: 17px; }
 .after li + li { border-top: 1px solid var(--line); }
 .after li .ic { width: 20px; height: 20px; margin-top: 0.12em; }
 .after-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
-.after .ok { color: var(--ok); font-weight: 600; } .after .bad { color: var(--danger); font-weight: 700; } .after .unknown { color: var(--warn); font-weight: 600; } .after .info { color: var(--muted); }
+.after .ok { color: var(--ok); font-weight: 600; } .after .bad { color: var(--danger); font-weight: 700; } .after .unknown { color: var(--warn-text); font-weight: 600; } .after .info { color: var(--muted); }
 
 /* sections */
 .section { padding: 88px 0 0; text-align: center; }
@@ -385,11 +493,11 @@ h2 { font-weight: 800; letter-spacing: -0.03em; }
 .check.found h3 .ic { color: var(--warn); }
 .check.yours h3 .ic { color: var(--muted); }
 .chips { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
-.chips li { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px; background: #fff; font-size: 15px; font-weight: 600; }
+.chips li { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px; background: var(--surface); font-size: 15px; font-weight: 600; }
 .chips .ic { width: 16px; height: 16px; color: var(--muted); }
 .check p { margin: -8px 0 0; font-size: 15px; line-height: 1.45; color: var(--muted); } /* close under its heading */
 .ai-line { max-width: 1080px; margin: 16px auto 0; display: flex; align-items: center; gap: 12px; padding: 16px 22px; border: 1px solid var(--line); border-radius: 18px; text-align: left; font-size: 16px; color: var(--muted); }
-.ai-line .ic { width: 22px; height: 22px; color: #7a5cd6; }
+.ai-line .ic { width: 22px; height: 22px; color: var(--ai); }
 .ai-line b { color: var(--text); }
 
 /* Checks and Questions on a computer: heading on the left, held in view while the cards or the
@@ -413,18 +521,23 @@ h2 { font-weight: 800; letter-spacing: -0.03em; }
 
 /* The last call: as wide as the content, straight top with big round corners, light yellow at
    the top fading to the page colour downwards, so it stands apart without a filled box. */
-.final { margin: 110px 0 0; padding: 96px 32px 64px; text-align: center; border-radius: 48px 48px 0 0; background: linear-gradient(to bottom, #fff6bf 0%, rgba(255, 246, 191, .55) 45%, rgba(255, 246, 191, 0) 100%); }
+.final { margin: 110px 0 0; padding: 96px 32px 64px; text-align: center; border-radius: 48px 48px 0 0; background: linear-gradient(to bottom, rgba(var(--final), var(--final-a)) 0%, rgba(var(--final), calc(var(--final-a) * .55)) 45%, rgba(var(--final), 0) 100%); }
 .final .big { margin-bottom: 14px; }
 .final .sub { margin-bottom: 30px; color: var(--muted); }
 .foot { max-width: 1180px; margin: 0 auto; padding: 24px 24px 0; color: var(--muted); font-size: 15px; text-align: center; overflow: hidden; }
 /* The service name, pale, exactly the width of the content column, cut by the bottom edge. */
 .wm { position: relative; margin-top: 28px; user-select: none; pointer-events: none; }
 .wordmark { position: relative; z-index: 1; display: block; width: 100%; height: auto; }
-.wordmark text { font: 800 100px "Figtree", sans-serif; letter-spacing: -5.5px; fill: #efeee8; }
+.wordmark text { font: 800 100px "Figtree", sans-serif; letter-spacing: -5.5px; fill: var(--wordmark); }
 body.working .foot { padding-bottom: 40px; }
 
 /* ---------- the logo in the header (js/logo.js) ---------- */
 .logo-svg { display: block; width: 32px; height: 32px; overflow: visible; }
+/* The logo's tile is a dark navy: on a dark page a faint ring keeps its edge. */
+@media (prefers-color-scheme: dark) {
+  /* (assets/favicon.svg, the logo on the plain pages, rings itself.) */
+  .logo-svg > rect:first-child { stroke: rgba(255, 255, 255, .18); stroke-width: 2; }
+}
 .logo-svg .lg-pin, .logo-svg .lg-eyes, .logo-svg .lg-eye, .logo-svg .lg-bits circle { transform-box: fill-box; transform-origin: center; }
 .logo-svg .lg-pin { transform-origin: 50% 100%; }
 /* The eyes follow the mouse: js/logo.js sets --lx/--ly. */
@@ -453,6 +566,10 @@ a:hover .logo-svg .lg-eye { transform: scaleY(.62); }
 /* ---------- the mascot (js/mascot.js draws it, js/mascot-places.js runs its scenes) ---------- */
 .mascot { display: block; }
 .mascot-svg { display: block; width: 100%; height: auto; overflow: visible; }
+/* The ledge it hides behind is the footer's name, and its badge is ringed in the page colour:
+   both follow the theme (css beats the svg's own fill and stroke). */
+.mascot-svg .m-ledge { fill: var(--wordmark); }
+.mascot-svg .m-badge { stroke: var(--page); }
 /* It can be pulled like dough; a swipe over it still scrolls the page. */
 .mascot-grab { cursor: grab; touch-action: pan-y; -webkit-tap-highlight-color: transparent; }
 .mascot-grab:active { cursor: grabbing; }
@@ -568,6 +685,10 @@ body:not(.working) .foot p { pointer-events: auto; }
   .work .editor { grid-area: editor; }
   .work .actionbar { grid-area: action; }
   .panel { padding: 14px; border-radius: 20px; }
+  .batch { margin-top: 12px; padding: 20px 14px; border-radius: 20px; }
+  .batch h2 { font-size: 26px; margin-right: 64px; }
+  .batch-sub { margin-right: 0; }
+  .mascot-batch { top: 12px; right: 12px; width: 60px; }
   .panel h2 { font-size: 26px; }
   .btn { font-size: 18px; padding: 18px 28px; }
   .btn-sm { font-size: 15px; padding: 9px 16px; }
@@ -589,5 +710,14 @@ body:not(.working) .foot p { pointer-events: auto; }
   .ai-line { align-items: flex-start; padding: 14px 16px; font-size: 15px; }
   /* The download button stays in reach at the bottom of the screen. */
   /* Stuck to the bottom of the screen while you read the report below it. */
-  .actionbar { position: sticky; bottom: 0; z-index: 5; padding: 10px 0; gap: 6px; background: var(--page); box-shadow: 0 -10px 16px rgba(255, 255, 255, .92); }
+  .actionbar { position: sticky; bottom: 0; z-index: 5; padding: 10px 0; gap: 6px; background: var(--page); box-shadow: 0 -10px 16px var(--page-glow); }
 }
+
+/* ---------- plain pages: licenses.html, 404.html ---------- */
+body.doc .foot { margin-top: 0; padding: 48px 24px 40px; pointer-events: auto; }
+.doc-body { max-width: 760px; margin: 32px auto 0; }
+.doc-body h1 { font-size: clamp(34px, 5.2vw, 52px); line-height: 1.05; margin: 0 0 14px; }
+.doc-list { list-style: none; padding: 0; margin: 28px 0 32px; }
+.doc-list li { border-bottom: 1px solid var(--line); padding: 16px 4px; }
+.doc-list b { color: var(--text); }
+.doc-body a:not(.btn) { color: var(--text); }

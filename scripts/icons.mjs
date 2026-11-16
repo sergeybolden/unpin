@@ -10,7 +10,7 @@ const NAMES = [
   "map-pin", "clock", "device-mobile", "camera", "drone", "hash", "user-circle", "note-pencil", "magic-wand", "image", "stack", "seal-check",
   "smiley", "car-profile", "mountains", "qr-code", "bridge", "boat", "file-image", "file-x", "barcode",
   // actions and states
-  "upload-simple", "download-simple", "arrow-left", "arrow-right", "selection-plus", "cursor", "eye", "eye-slash", "corners-out", "corners-in", "trash", "x", "arrow-counter-clockwise",
+  "upload-simple", "download-simple", "export", "arrow-left", "arrow-right", "selection-plus", "cursor", "eye", "eye-slash", "corners-out", "corners-in", "trash", "x", "arrow-counter-clockwise",
   "check-circle", "x-circle", "question", "info", "shield-check", "wifi-slash", "sparkle", "scan", "lightbulb",
   // clues
   "signpost", "house-line", "app-window", "sunglasses", "package", "monitor", "key",

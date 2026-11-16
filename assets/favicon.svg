@@ -1,7 +1,9 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
   <!-- Simplified Unpin mascot for 16-48 px: no hands, shadows or gradients; thicker bar, larger eyes.
        Eyes and body top/bottom sit on even coordinates, so they stay crisp at 32 px (a 16 pt tab on Retina). -->
-  <rect width="64" height="64" rx="16" fill="#171630"/>
+  <!-- On a dark page or tab bar the navy tile gets a faint ring, so its edge still shows. -->
+  <style>@media (prefers-color-scheme: dark) { .tile { stroke: #ffffff; stroke-opacity: .2; stroke-width: 2; } }</style>
+  <rect class="tile" width="64" height="64" rx="16" fill="#171630"/>
   <!-- Same symmetric body as the mascot, axis x=30 (nudged left to balance the bar's right end). -->
   <path d="M 30 6 C 40.72 6, 49.79 14.52, 49.79 24.82 C 49.79 30.72, 47.29 36.39, 43.09 42.41 C 39.56 47.52, 35 53.74, 31.58 57.27 C 30.61 58.24, 29.39 58.24, 28.42 57.27 C 25 53.74, 20.44 47.52, 16.91 42.41 C 12.71 36.39, 10.21 30.72, 10.21 24.82 C 10.21 14.52, 19.28 6, 30 6 Z" fill="#ffffff"/>
   <!-- Eyes are "holes" in the tile color, like on the dark mascot. -->

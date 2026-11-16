@@ -18,21 +18,29 @@ concurrency:
   group: pages
   cancel-in-progress: true
 
+# Actions are pinned to full commit SHAs (a tag can be moved); the comment says which release.
+# Dependabot (.github/dependabot.yml) proposes updates.
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           persist-credentials: false
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22
       # No install scripts: the tests need the packages' files, not anything they would run.
       - run: npm ci --ignore-scripts
       - run: npm test
+      # The browser for the end-to-end test, installed on purpose rather than by a package script.
+      # Only Chromium's headless shell, the build Playwright runs headless.
+      - name: Install Chromium for the end-to-end test
+        run: npx --no-install playwright install --with-deps --only-shell chromium
+      - run: npm run test:e2e
 
   deploy:
     needs: test
@@ -45,7 +53,7 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           persist-credentials: false
 
@@ -56,16 +64,37 @@ jobs:
           stars=$(gh api "repos/${GITHUB_REPOSITORY}" --jq .stargazers_count || echo "")
           if [ -n "$stars" ]; then echo "{\"stars\": $stars}" > stars.json; fi
 
-      # Only the site itself: no tests, scripts or Worker code.
+      # Only the site itself: the pages at the top level and what they load.
+      # No tests, scripts, packages or repository docs.
       - name: Collect the site files
         run: |
           mkdir _site
-          cp -r index.html manifest.webmanifest sw.js css js assets vendor _site/
+          cp *.html _site/
+          cp -r manifest.webmanifest sw.js css js assets vendor _site/
           [ -f stars.json ] && cp stars.json _site/ || true
 
-      - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5.0.0
+      - uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3.0.1
         with:
           path: _site
       - id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4.0.5
+
+  # GitHub turns off the schedule of a public repository after 60 days without activity in it,
+  # and the star count would stop updating without a word. Enabling the workflow through the API
+  # resets that count, so each scheduled run keeps the schedule alive: no commits to main, no
+  # token beyond this run's own. The job checks out nothing and installs nothing;
+  # actions: write is the narrowest permission the endpoint accepts.
+  # Limit: this only works while the schedule runs. If it was already turned off (or a run fails
+  # for weeks), turn it back on by hand under Actions → Tests and deploy → Enable workflow.
+  keep-schedule:
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: write
+    steps:
+      - name: Keep the schedule enabled
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api -X PUT "repos/${GITHUB_REPOSITORY}/actions/workflows/pages.yml/enable"

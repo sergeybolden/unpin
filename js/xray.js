@@ -93,22 +93,92 @@ function fmtDate(v, offset) {
   return offset ? `${s} (UTC${offset})` : s;
 }
 
-// Read PNG text chunks ourselves: AI tools put whole prompts there.
-function pngTexts(bytes) {
+// Read PNG text chunks ourselves: AI tools put whole prompts there, and ComfyUI whole workflows.
+// tEXt: keyword, NUL, text. zTXt: keyword, NUL, method 0, zlib text. iTXt: keyword, NUL, compressed
+// flag, method 0, language tag, NUL, translated keyword, NUL, UTF-8 text (zlib when the flag is 1).
+// Unpacking is capped: a few bytes of zlib can stand for gigabytes. A text over the cap, or one
+// that doesn't unpack, is skipped, never shown cut off; the report only ever shows its start.
+export const PNG_TEXT_MAX = 1 << 20; // one text: ComfyUI workflows run to a few hundred KB
+export const PNG_TEXT_TOTAL = 4 << 20; // all compressed texts together
+export const PNG_TEXT_ZIPPED = 256; // compressed chunks unpacked at most: each one starts a stream
+
+const latin1 = new TextDecoder("latin1");
+const utf8 = new TextDecoder("utf-8", { fatal: true });
+// tEXt is Latin-1 by the spec, but many tools write UTF-8 there; valid UTF-8 is read as UTF-8.
+function tEXtString(b) {
+  try { return utf8.decode(b); } catch { return latin1.decode(b); }
+}
+const utf8Lenient = new TextDecoder();
+
+// zlib data unpacked into at most `cap` bytes, or null: too large, broken, or no streams here.
+async function unzip(data, cap) {
+  if (typeof DecompressionStream !== "function") return null;
+  let reader;
+  try {
+    reader = new Blob([data]).stream().pipeThrough(new DecompressionStream("deflate")).getReader();
+    const parts = [];
+    let n = 0;
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      n += value.length;
+      if (n > cap) { reader.cancel().catch(() => {}); return null; }
+      parts.push(value);
+    }
+    const out = new Uint8Array(n);
+    let o = 0;
+    for (const p of parts) { out.set(p, o); o += p.length; }
+    return out;
+  } catch {
+    reader?.cancel().catch(() => {});
+    return null;
+  }
+}
+
+// { keyword: text }. The last chunk with a keyword wins, as before. Never throws.
+export async function pngTexts(bytes) {
   const out = {};
   const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-  const td = new TextDecoder("latin1");
-  for (let i = 8, n = 0; i + 8 <= bytes.length && n < MAX_BLOCKS; n++) {
+  let budget = PNG_TEXT_TOTAL, zipped = 0;
+  const unpack = async (data) => {
+    if (zipped >= PNG_TEXT_ZIPPED || budget <= 0) return null;
+    zipped++;
+    const raw = await unzip(data, Math.min(PNG_TEXT_MAX, budget));
+    if (raw) budget -= raw.length;
+    return raw;
+  };
+  for (let i = 8, n = 0; i + 12 <= bytes.length && n < MAX_BLOCKS; n++) {
     const len = dv.getUint32(i);
-    const type = td.decode(bytes.subarray(i + 4, i + 8));
-    if (type === "tEXt" || type === "iTXt") {
-      const data = bytes.subarray(i + 8, i + 8 + len);
-      const z = data.indexOf(0);
-      const key = td.decode(data.subarray(0, z));
-      out[key] = new TextDecoder().decode(data.subarray(z + 1)).replace(/^[\0\s]+/, "");
-    }
+    if (len > bytes.length - i - 12) break; // runs past the end of the file
+    const type = latin1.decode(bytes.subarray(i + 4, i + 8));
     if (type === "IEND") break;
+    const data = bytes.subarray(i + 8, i + 8 + len);
     i += 12 + len;
+    if (type !== "tEXt" && type !== "zTXt" && type !== "iTXt") continue;
+    const z = data.indexOf(0);
+    if (z < 1 || z > 79) continue; // keywords are 1 to 79 bytes
+    const key = latin1.decode(data.subarray(0, z));
+    let value = null;
+    try {
+      if (type === "tEXt") value = tEXtString(data.subarray(z + 1));
+      else if (type === "zTXt") {
+        if (data[z + 1] !== 0 || z + 2 > data.length) continue;
+        const raw = await unpack(data.subarray(z + 2));
+        if (raw) value = latin1.decode(raw);
+      } else {
+        const flag = data[z + 1], method = data[z + 2];
+        if (z + 3 > data.length || flag > 1 || (flag === 1 && method !== 0)) continue;
+        const lang = data.indexOf(0, z + 3);
+        const tkey = lang < 0 ? -1 : data.indexOf(0, lang + 1);
+        if (tkey < 0) continue;
+        const body = data.subarray(tkey + 1);
+        const raw = flag ? await unpack(body) : body;
+        if (raw) value = utf8Lenient.decode(raw);
+      }
+    } catch {
+      value = null;
+    }
+    if (value != null) out[key] = value;
   }
   return out;
 }
@@ -127,7 +197,7 @@ export async function xray(file, bytes, format, stripPreview, metaSrc = file) {
     }
   }
   const findings = [];
-  const png = format === "png" ? pngTexts(bytes) : {}; // PNG text chunks: names, prompts, settings, XMP
+  const png = format === "png" ? await pngTexts(bytes) : {}; // PNG text chunks: names, prompts, settings, XMP
   const add = (f) => findings.push(f);
 
   // Location: coordinates (EXIF or XMP), and place names written into the file.
